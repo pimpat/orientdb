@@ -30,7 +30,7 @@
 #define MAX_NODE_REF_SIZE (1000)
 #define MAX_CONTENT_SIZE (1000)
 #define MAX_NEW_TAG (20)
-#define FULL_CONTENT (3)
+#define FULL_CONTENT (4)
 #define VER_KEEPED (3)
 
 using namespace std;
@@ -143,20 +143,20 @@ ObjectBinary* getDataContentCommonVersionByID(char* dataID);
 ObjectBinary* getDataContentByID(char* dataID);
 Text getDiffDataAtlastestCommon(Data* data);
 Text getDiffDataAthead(Data* data);
-//Text getDiffDataAtlastestCommonByID(char* dataID);
-//Text getDiffDataAtheadByID(char* dataID);
+Text getDiffDataAtlastestCommonByID(char* dataID);
+Text getDiffDataAtheadByID(char* dataID);
 ObjectBinary* getContentNextVer(Data* data);
 ObjectBinary* getContentPreVer(Data* data);
-//ObjectBinary getContentNextVerByID(char* dataID);
-//ObjectBinary getContentPreVerByID(char* dataID);
+ObjectBinary* getContentNextVerByID(char* dataID);
+ObjectBinary* getContentPreVerByID(char* dataID);
 Text getDiffDataNextVer(Data* data);
 Text getDiffDataPreVer(Data* data);
-//Text getDiffDataNextVerByID(char* dataID);
-//Text getDiffDataPreVerByID(char* dataID);
+Text getDiffDataNextVerByID(char* dataID);
+Text getDiffDataPreVerByID(char* dataID);
 int getCurLevelFromlastestCommon(Data* data);
 int getCurLevelFromCommon(Data* data);
 Text getDataContentWithTag(Data* data, char* tagName);
-//Text getDataContentWithTagByID(char* dataID, char* tagName);
+Text getDataContentWithTagByID(char* dataID, char* tagName);
 int setNewDataContent(Data* data, char* diffContent);
 int setNewDataDiffWithTag(Data* data, char* tagName, char* diff);
 Text getTagContent(ObjectBinary* fullContent, char* tagName);
@@ -166,7 +166,7 @@ const char* createOrg(Text orgName);
 const char* createUser(Text userName);
 const char* createCategory(Text categoryName);
 const char* createData(Text dataName);
-//Text getDataContent(char* schema, char* dataID, char* keyName); // continue here
+Text getDataContent(char* schema, char* dataID, char* keyName);
 int addData2Category(char* categoryID, Data* data);
 int addData2CategoryTest(char* categoryID, Data* data);
 int addCategory2User(char* userID, char* categoryID);
@@ -175,8 +175,8 @@ int addUser2Org(char* orgID, char* userID);
 //Data* queryDataByID(char* dataID);
 //Category* queryCategoryByID(char* dataID);
 //User *queryUserByID(char* dataID);
-//DeviceRef** getDeviceRefListByID(char* dataID);
 DeviceRef** getDeviceRefList(Data* data);
+DeviceRef** getDeviceRefListByID(char* dataID);
 
 //  draft #1
 //Data* queryDataByID(char* dataID);
@@ -201,6 +201,7 @@ void testArrayRid();
 void testqueryCategoryByID(char* myID);
 void testqueryUserByID(char* myID);
 void testDraft2();
+void testDraft2_ByID();
 
 int main() {
     int ret;
@@ -229,16 +230,8 @@ int main() {
     //getRid("select in from (select expand(out_toDataContent) from #19:43) where name='lastestCommon')");
     //testDraft2();
     //getContent("SELECT xmlSchema,data,byteCount from #22:414");
-    ObjectBinary* myobj;
-    myobj = getDataContentCommonVersionByID("9C7279CFD0FA400E9F41391FE843A075");
-    
-    printf("\n\nxml: %s\n",myobj->xmlSchema);
-    printf("data: %s\n",myobj->data);
-    printf("byteCount: %d\n",myobj->byteCount);
-    
-    free(myobj->xmlSchema);
-    free(myobj->data);
-    free(myobj);
+
+    testDraft2_ByID();
 
     /* A set for test */
 //    testUserCategory(1);
@@ -760,12 +753,16 @@ char* getRid(char *query) {
     read(Sockfd, &GPacket.msg, 2+1+2+8+4);
     //read(Sockfd, &GPacket.msg, 1+4+2+1+2+8+4);
     
+    if(total==0){
+        printf("FAILED >> data not found\n");
+        return NULL;
+    }
+    
     char myResult[15];
     char* str;
     char* token;
     char delim[2] = "#";
     //char* str = (char*)malloc(sizeof(char)*10);   (fix)
-    
     
     for(i=0;i<total;i++){
         read(Sockfd, &size, 4);
@@ -969,7 +966,7 @@ ObjectBinary* getDataContentCommonVersionByID(char* dataID){
     printf("SQL: %s\n",sql);
     rid_dh = getRid(sql);
     
-    printf("--------------------------------------------------[get @rid 1st DataContent]\n");
+    printf("--------------------------------------------------[get @rid lastestCommon]\n");
     sprintf(sql,"SELECT in from (select expand(out_toDataContent) from #%s) where name = 'lastestCommon')",rid_dh);
     printf("SQL: %s\n",sql);
     rid_dc = getRid(sql);
@@ -987,7 +984,7 @@ ObjectBinary* getDataContentCommonVersionByID(char* dataID){
     printf("\n\nbyteCount: %d\n", obj_ct->byteCount);
     
     token = strtok(NULL,"\"");
-    token = strtok(NULL,"\n");
+    token = strtok(NULL,"\"");
     //printf("\ndata: %s\n",token);
     char* result_data = strdup(token);
     //printf("len: %d\n",strlen(result_data));
@@ -1017,7 +1014,129 @@ ObjectBinary* getDataContentCommonVersionByID(char* dataID){
 }
 
 ObjectBinary* getDataContentByID(char* dataID){
+    ObjectBinary* obj_ct = (ObjectBinary*)malloc(sizeof(ObjectBinary));
+    char sql[MAX_SQL_SIZE];
+    char *rid_dh;
+    char* token;
+    int i=0;
+    int count=0;
     
+    printf("--------------------------------------------------[get @rid DataHolder]\n");
+    sprintf(sql,"SELECT @rid from (select expand(out('toDataHolder')) from Data where dataID ='%s')",dataID);
+    printf("SQL: %s\n",sql);
+    rid_dh = getRid(sql);
+    
+    /*
+    printf("--------------------------------------------------[get versionCount]\n");
+    sprintf(sql,"SELECT versionCount from #%s",rid_dh);
+    printf("SQL: %s\n",sql);
+    result1 = getContent(sql);
+    
+    token = strtok(result1,":");
+    token = strtok(NULL,"\n");
+    count = atoi(token);
+    printf("versionCount: %d\n", count);
+    */
+    
+    char* rid_dc[FULL_CONTENT];
+    char* result_dc[FULL_CONTENT];
+    int full_con=0;
+    char* result_data;
+    char* result_schema;
+    
+    printf("--------------------------------------------------[get @rid head]\n");
+    sprintf(sql,"SELECT in from (select expand(out_toDataContent) from #%s) where name = 'head'",rid_dh);
+    printf("SQL: %s\n",sql);
+    rid_dc[0] = getRid(sql);
+    printf("rid_head: %s\n",rid_dc[0]);
+    
+    for(i=0;i<FULL_CONTENT;i++){
+        printf("--------------------------------------------------[get data]\n");
+        sprintf(sql,"SELECT isDiff,data from #%s",rid_dc[i]);
+        result_data = getContent(sql);
+        
+        token = strtok(result_data, ":");
+        token = strtok(NULL, ",");
+        if(strcmp(token,"false")==0){
+            full_con=1;
+        }
+        token = strtok(NULL,"\"");
+        token = strtok(NULL,"\"");
+        
+        // หั่น data รอไว้
+        result_dc[i] = strdup(token);
+        printf("result_dc[%d]: %s\n",i,result_dc[i]);
+
+        // เป็น full ตั้งแต่ head
+        if(full_con==1 && i==0){
+            // retturn เลย
+            printf("--------------------------------------------------[get objContent_Schema]\n");
+            sprintf(sql,"SELECT xmlSchema from #%s",rid_dc[i]);
+            printf("SQL: %s\n",sql);
+            result_schema = getContent(sql);
+            printf("result_schema: %s\n",result_schema);
+            char* temp = (char*)malloc(sizeof(char)*MAX_SCHEMA);
+            memcpy(temp,result_schema+11,strlen(result_schema)-11);
+            temp[strlen(temp)-1] = '\0';
+            printf("\ntemp: %s\n",temp);
+            obj_ct->xmlSchema = temp;
+            obj_ct->byteCount = strlen(obj_ct->xmlSchema);
+            obj_ct->data = result_dc[i];
+            
+            free(result_data);
+            free(result_schema);
+            free(rid_dc[i]);
+            //free(result_dc[i]);
+            free(rid_dh);
+            return obj_ct;
+        }
+        // เจอ full ที่ตน.อื่น
+        else if(full_con==1 && i!=0){
+            printf("--------------------------------------------------[get objContent_Schema]\n");
+            sprintf(sql,"SELECT xmlSchema from #%s",rid_dc[i]);
+            printf("SQL: %s\n",sql);
+            result_schema = getContent(sql);
+            printf("result_schema: %s\n",result_schema);
+            char* temp = (char*)malloc(sizeof(char)*MAX_SCHEMA);
+            memcpy(temp,result_schema+11,strlen(result_schema)-11);
+            temp[strlen(temp)-1] = '\0';
+            printf("\ntemp: %s\n",temp);
+            obj_ct->xmlSchema = temp;
+            // ออกจากลูป แล้วเริ่ม patch ที่ตน. i->0 (byteCount/data)
+            free(result_data);
+            free(result_schema);
+            break;
+        }
+        else{
+            sprintf(sql,"select in from (select expand(out_toDiffContent) from #%s) where status='pre'",rid_dc[i]);
+            printf("SQL: %s\n",sql);
+            rid_dc[i+1] = getRid(sql);
+            printf("rid[%d]: %s\n",i+1,rid_dc[i+1]);
+            free(result_data);
+        }
+    }
+    printf("\ni: %d\n\n",i);
+    
+    //Patch
+    string s;
+    char* init_str = (char*)malloc(sizeof(char)*MAX_DIFF_SIZE);
+    sprintf(init_str,"%s",result_dc[i]);
+    int j;
+    for(j=i;j>0;j--){
+        s = getPatch(init_str, result_dc[j-1]);
+        sprintf(init_str,"%s",s.c_str());
+    }
+    //printf("\n\n\nMY DATA: %s\n",init_str);
+    obj_ct->data = strdup(init_str);
+    obj_ct->byteCount = strlen(obj_ct->data);
+    free(init_str);
+    
+    for(j=i;j>=0;j--){
+        free(rid_dc[j]);
+        free(result_dc[j]);
+    }
+    free(rid_dh);
+    return obj_ct;
 }
 
 Text getDiffDataAtlastestCommon(Data* data){
@@ -1026,6 +1145,70 @@ Text getDiffDataAtlastestCommon(Data* data){
 
 Text getDiffDataAthead(Data* data){
     return data->content->head->objContent->data;
+}
+
+Text getDiffDataAtlastestCommonByID(char* dataID){
+    char sql[MAX_SQL_SIZE];
+    char *rid_dh, *rid_dc;
+    char *result, *str_data;
+    char* token;
+    
+    printf("--------------------------------------------------[get @rid DataHolder]\n");
+    sprintf(sql,"SELECT @rid from (select expand(out('toDataHolder')) from Data where dataID ='%s')",dataID);
+    printf("SQL: %s\n",sql);
+    rid_dh = getRid(sql);
+    
+    printf("--------------------------------------------------[get @rid lastestCommon]\n");
+    sprintf(sql,"SELECT in from (select expand(out_toDataContent) from #%s) where name = 'lastestCommon')",rid_dh);
+    printf("SQL: %s\n",sql);
+    rid_dc = getRid(sql);
+    
+    printf("--------------------------------------------------[get objContent]\n");
+    sprintf(sql,"SELECT data from #%s",rid_dc);
+    printf("SQL: %s\n",sql);
+    result = getContent(sql);
+    
+    token = strtok(result,"\"");
+    token = strtok(NULL,"\"");
+    printf("data: %s\n", token);
+    str_data = strdup(token);
+    
+    free(rid_dh);
+    free(rid_dc);
+    free(result);
+    return str_data;
+}
+
+Text getDiffDataAtheadByID(char* dataID){
+    char sql[MAX_SQL_SIZE];
+    char *rid_dh, *rid_dc;
+    char *result, *str_data;
+    char* token;
+    
+    printf("--------------------------------------------------[get @rid DataHolder]\n");
+    sprintf(sql,"SELECT @rid from (select expand(out('toDataHolder')) from Data where dataID ='%s')",dataID);
+    printf("SQL: %s\n",sql);
+    rid_dh = getRid(sql);
+    
+    printf("--------------------------------------------------[get @rid head]\n");
+    sprintf(sql,"SELECT in from (select expand(out_toDataContent) from #%s) where name = 'head')",rid_dh);
+    printf("SQL: %s\n",sql);
+    rid_dc = getRid(sql);
+    
+    printf("--------------------------------------------------[get objContent]\n");
+    sprintf(sql,"SELECT data from #%s",rid_dc);
+    printf("SQL: %s\n",sql);
+    result = getContent(sql);
+    
+    token = strtok(result,"\"");
+    token = strtok(NULL,"\"");
+    printf("data: %s\n", token);
+    str_data = strdup(token);
+    
+    free(rid_dh);
+    free(rid_dc);
+    free(result);
+    return str_data;
 }
 
 ObjectBinary* getContentNextVer(Data* data){
@@ -1124,6 +1307,262 @@ ObjectBinary* getContentPreVer(Data* data){
     }
 }
 
+ObjectBinary* getContentNextVerByID(char* dataID){
+    char sql[MAX_SQL_SIZE];
+    char *rid_dh, *rid_cur;
+    char* token;
+    int i;
+    
+    printf("--------------------------------------------------[get @rid DataHolder]\n");
+    sprintf(sql,"SELECT @rid from (select expand(out('toDataHolder')) from Data where dataID ='%s')",dataID);
+    printf("SQL: %s\n",sql);
+    rid_dh = getRid(sql);
+    
+    printf("--------------------------------------------------[get @rid current]\n");
+    sprintf(sql,"SELECT in from (select expand(out_toDataContent) from #%s) where name = 'current')",rid_dh);
+    printf("SQL: %s\n",sql);
+    rid_cur = getRid(sql);
+    
+    char* rid_dc[FULL_CONTENT];
+    char* result_dc[FULL_CONTENT];
+    int full_con=0;
+    char* result_data;
+    char* result_schema;
+
+    printf("--------------------------------------------------[get @rid next_current]\n");
+    sprintf(sql,"SELECT in from (select expand(out_toDiffContent) from #%s) where status = 'next')",rid_cur);
+    printf("SQL: %s\n",sql);
+    rid_dc[0] = getRid(sql);
+    
+    if(rid_dc[0]==NULL){
+        printf("\n*** Now current is pointing to head\n");
+        free(rid_dh);
+        free(rid_cur);
+        return NULL;
+    }
+    else{
+        printf("rid_nextCurrrent: %s\n",rid_dc[0]);
+        ObjectBinary* obj_ct = (ObjectBinary*)malloc(sizeof(ObjectBinary));
+        
+        for(i=0;i<FULL_CONTENT;i++){
+            printf("--------------------------------------------------[get data]\n");
+            sprintf(sql,"SELECT isDiff,data from #%s",rid_dc[i]);
+            printf("SQL: %s\n",sql);
+            result_data = getContent(sql);
+            
+            token = strtok(result_data, ":");
+            token = strtok(NULL, ",");
+            if(strcmp(token,"false")==0){
+                full_con=1;
+            }
+            token = strtok(NULL,"\"");
+            token = strtok(NULL,"\"");
+            
+            // หั่น data รอไว้
+            result_dc[i] = strdup(token);
+            printf("result_dc[%d]: %s\n",i,result_dc[i]);
+            
+            // เป็น full ตั้งแต่ head
+            if(full_con==1 && i==0){
+                // retturn เลย
+                printf("--------------------------------------------------[get objContent_Schema]\n");
+                sprintf(sql,"SELECT xmlSchema from #%s",rid_dc[i]);
+                printf("SQL: %s\n",sql);
+                result_schema = getContent(sql);
+                //printf("result_schema: %s\n",result_schema);
+                char* temp = (char*)malloc(sizeof(char)*MAX_SCHEMA);
+                memcpy(temp,result_schema+11,strlen(result_schema)-11);
+                temp[strlen(temp)-1] = '\0';
+                printf("\ntemp: %s\n",temp);
+                obj_ct->xmlSchema = temp;
+                obj_ct->byteCount = strlen(obj_ct->xmlSchema);
+                obj_ct->data = result_dc[i];
+                
+                free(result_data);
+                free(result_schema);
+                free(rid_dc[i]);
+                //free(result_dc[i]);
+                free(rid_dh);
+                return obj_ct;
+            }
+            // เจอ full ที่ตน.อื่น
+            else if(full_con==1 && i!=0){
+                printf("--------------------------------------------------[get objContent_Schema]\n");
+                sprintf(sql,"SELECT xmlSchema from #%s",rid_dc[i]);
+                printf("SQL: %s\n",sql);
+                result_schema = getContent(sql);
+                printf("result_schema: %s\n",result_schema);
+                char* temp = (char*)malloc(sizeof(char)*MAX_SCHEMA);
+                memcpy(temp,result_schema+11,strlen(result_schema)-11);
+                temp[strlen(temp)-1] = '\0';
+                printf("\ntemp: %s\n",temp);
+                obj_ct->xmlSchema = temp;
+                // ออกจากลูป แล้วเริ่ม patch ที่ตน. i->0 (byteCount/data)
+                free(result_data);
+                free(result_schema);
+                break;
+            }
+            else{
+                sprintf(sql,"select in from (select expand(out_toDiffContent) from #%s) where status='pre'",rid_dc[i]);
+                printf("SQL: %s\n",sql);
+                rid_dc[i+1] = getRid(sql);
+                printf("rid[%d]: %s\n",i+1,rid_dc[i+1]);
+                free(result_data);
+            }
+        }
+        
+        //Patch
+        string s;
+        char* init_str = (char*)malloc(sizeof(char)*MAX_DIFF_SIZE);
+        sprintf(init_str,"%s",result_dc[i]);
+        int j;
+        for(j=i;j>0;j--){
+            s = getPatch(init_str, result_dc[j-1]);
+            sprintf(init_str,"%s",s.c_str());
+        }
+        //printf("\n\n\nMY DATA: %s\n",init_str);
+        obj_ct->data = strdup(init_str);
+        obj_ct->byteCount = strlen(obj_ct->data);
+        free(init_str);
+        
+        for(j=i;j>=0;j--){
+            free(rid_dc[j]);
+            free(result_dc[j]);
+        }
+        free(rid_dh);
+        free(rid_cur);
+        return obj_ct;
+    }
+}
+
+ObjectBinary* getContentPreVerByID(char* dataID){
+    char sql[MAX_SQL_SIZE];
+    char *rid_dh, *rid_cur;
+    char* token;
+    int i;
+    
+    printf("--------------------------------------------------[get @rid DataHolder]\n");
+    sprintf(sql,"SELECT @rid from (select expand(out('toDataHolder')) from Data where dataID ='%s')",dataID);
+    printf("SQL: %s\n",sql);
+    rid_dh = getRid(sql);
+    
+    printf("--------------------------------------------------[get @rid current]\n");
+    sprintf(sql,"SELECT in from (select expand(out_toDataContent) from #%s) where name = 'current')",rid_dh);
+    printf("SQL: %s\n",sql);
+    rid_cur = getRid(sql);
+    
+    char* rid_dc[FULL_CONTENT];
+    char* result_dc[FULL_CONTENT];
+    int full_con=0;
+    char* result_data;
+    char* result_schema;
+    
+    printf("--------------------------------------------------[get @rid pre_current]\n");
+    sprintf(sql,"SELECT in from (select expand(out_toDiffContent) from #%s) where status = 'pre')",rid_cur);
+    printf("SQL: %s\n",sql);
+    rid_dc[0] = getRid(sql);
+    
+    if(rid_dc[0]==NULL){
+        printf("\n*** Now current is pointing to lastestCommon\n");
+        free(rid_dh);
+        free(rid_cur);
+        return NULL;
+    }
+    else{
+        printf("rid_nextCurrrent: %s\n",rid_dc[0]);
+        ObjectBinary* obj_ct = (ObjectBinary*)malloc(sizeof(ObjectBinary));
+        
+        for(i=0;i<FULL_CONTENT;i++){
+            printf("--------------------------------------------------[get data]\n");
+            sprintf(sql,"SELECT isDiff,data from #%s",rid_dc[i]);
+            printf("SQL: %s\n",sql);
+            result_data = getContent(sql);
+            
+            token = strtok(result_data, ":");
+            token = strtok(NULL, ",");
+            if(strcmp(token,"false")==0){
+                full_con=1;
+            }
+            token = strtok(NULL,"\"");
+            token = strtok(NULL,"\"");
+            
+            // หั่น data รอไว้
+            result_dc[i] = strdup(token);
+            printf("result_dc[%d]: %s\n",i,result_dc[i]);
+            
+            // เป็น full ตั้งแต่ head
+            if(full_con==1 && i==0){
+                // retturn เลย
+                printf("--------------------------------------------------[get objContent_Schema]\n");
+                sprintf(sql,"SELECT xmlSchema from #%s",rid_dc[i]);
+                printf("SQL: %s\n",sql);
+                result_schema = getContent(sql);
+                //printf("result_schema: %s\n",result_schema);
+                char* temp = (char*)malloc(sizeof(char)*MAX_SCHEMA);
+                memcpy(temp,result_schema+11,strlen(result_schema)-11);
+                temp[strlen(temp)-1] = '\0';
+                printf("\ntemp: %s\n",temp);
+                obj_ct->xmlSchema = temp;
+                obj_ct->byteCount = strlen(obj_ct->xmlSchema);
+                obj_ct->data = result_dc[i];
+                
+                free(result_data);
+                free(result_schema);
+                free(rid_dc[i]);
+                //free(result_dc[i]);
+                free(rid_dh);
+                return obj_ct;
+            }
+            // เจอ full ที่ตน.อื่น
+            else if(full_con==1 && i!=0){
+                printf("--------------------------------------------------[get objContent_Schema]\n");
+                sprintf(sql,"SELECT xmlSchema from #%s",rid_dc[i]);
+                printf("SQL: %s\n",sql);
+                result_schema = getContent(sql);
+                printf("result_schema: %s\n",result_schema);
+                char* temp = (char*)malloc(sizeof(char)*MAX_SCHEMA);
+                memcpy(temp,result_schema+11,strlen(result_schema)-11);
+                temp[strlen(temp)-1] = '\0';
+                printf("\ntemp: %s\n",temp);
+                obj_ct->xmlSchema = temp;
+                // ออกจากลูป แล้วเริ่ม patch ที่ตน. i->0 (byteCount/data)
+                free(result_data);
+                free(result_schema);
+                break;
+            }
+            else{
+                sprintf(sql,"SELECT in from (select expand(out_toDiffContent) from #%s) where status='pre'",rid_dc[i]);
+                printf("SQL: %s\n",sql);
+                rid_dc[i+1] = getRid(sql);
+                printf("rid[%d]: %s\n",i+1,rid_dc[i+1]);
+                free(result_data);
+            }
+        }
+        
+        //Patch
+        string s;
+        char* init_str = (char*)malloc(sizeof(char)*MAX_DIFF_SIZE);
+        sprintf(init_str,"%s",result_dc[i]);
+        int j;
+        for(j=i;j>0;j--){
+            s = getPatch(init_str, result_dc[j-1]);
+            sprintf(init_str,"%s",s.c_str());
+        }
+        //printf("\n\n\nMY DATA: %s\n",init_str);
+        obj_ct->data = strdup(init_str);
+        obj_ct->byteCount = strlen(obj_ct->data);
+        free(init_str);
+        
+        for(j=i;j>=0;j--){
+            free(rid_dc[j]);
+            free(result_dc[j]);
+        }
+        free(rid_dh);
+        free(rid_cur);
+        return obj_ct;
+    }
+}
+
 Text getDiffDataNextVer(Data* data){
     if(data->content->current->nextVersion==NULL){
         printf("\n*** Now current is pointing to head\n");
@@ -1147,6 +1586,98 @@ Text getDiffDataPreVer(Data* data){
         tmp = data->content->current->preVersion;
         data->content->current = tmp;
         return data->content->current->objContent->data;
+    }
+}
+
+Text getDiffDataNextVerByID(char* dataID){
+    char sql[MAX_SQL_SIZE];
+    char *rid_dh, *rid_cur, *rid_next_cur;
+    char *result, *str_data;
+    char* token;
+    
+    printf("--------------------------------------------------[get @rid DataHolder]\n");
+    sprintf(sql,"SELECT @rid from (select expand(out('toDataHolder')) from Data where dataID ='%s')",dataID);
+    printf("SQL: %s\n",sql);
+    rid_dh = getRid(sql);
+    
+    printf("--------------------------------------------------[get @rid current]\n");
+    sprintf(sql,"SELECT in from (select expand(out_toDataContent) from #%s) where name = 'current')",rid_dh);
+    printf("SQL: %s\n",sql);
+    rid_cur = getRid(sql);
+    
+    printf("--------------------------------------------------[get @rid next_current]\n");
+    sprintf(sql,"SELECT in from (select expand(out_toDiffContent) from #%s) where status = 'next')",rid_cur);
+    printf("SQL: %s\n",sql);
+    rid_next_cur = getRid(sql);
+    
+    if(rid_next_cur==NULL){
+        printf("\n*** Now current is pointing to head\n");
+        free(rid_dh);
+        free(rid_cur);
+        return NULL;
+    }
+    else{
+        printf("--------------------------------------------------[get objContent]\n");
+        sprintf(sql,"SELECT data from #%s",rid_next_cur);
+        printf("SQL: %s\n",sql);
+        result = getContent(sql);
+    
+        token = strtok(result,"\"");
+        token = strtok(NULL,"\"");
+        printf("data: %s\n", token);
+        str_data = strdup(token);
+    
+        free(rid_dh);
+        free(rid_cur);
+        free(rid_next_cur);
+        free(result);
+        return str_data;
+    }
+}
+
+Text getDiffDataPreVerByID(char* dataID){
+    char sql[MAX_SQL_SIZE];
+    char *rid_dh, *rid_cur, *rid_pre_cur;
+    char *result, *str_data;
+    char* token;
+    
+    printf("--------------------------------------------------[get @rid DataHolder]\n");
+    sprintf(sql,"SELECT @rid from (select expand(out('toDataHolder')) from Data where dataID ='%s')",dataID);
+    printf("SQL: %s\n",sql);
+    rid_dh = getRid(sql);
+    
+    printf("--------------------------------------------------[get @rid current]\n");
+    sprintf(sql,"SELECT in from (select expand(out_toDataContent) from #%s) where name = 'current')",rid_dh);
+    printf("SQL: %s\n",sql);
+    rid_cur = getRid(sql);
+    
+    printf("--------------------------------------------------[get @rid pre_current]\n");
+    sprintf(sql,"SELECT in from (select expand(out_toDiffContent) from #%s) where status = 'pre')",rid_cur);
+    printf("SQL: %s\n",sql);
+    rid_pre_cur = getRid(sql);
+    
+    if(rid_pre_cur==NULL){
+        printf("\n*** Now current is pointing to lastestCommon\n");
+        free(rid_dh);
+        free(rid_cur);
+        return NULL;
+    }
+    else{
+        printf("--------------------------------------------------[get objContent]\n");
+        sprintf(sql,"SELECT data from #%s",rid_pre_cur);
+        printf("SQL: %s\n",sql);
+        result = getContent(sql);
+        
+        token = strtok(result,"\"");
+        token = strtok(NULL,"\"");
+        printf("data: %s\n", token);
+        str_data = strdup(token);
+        
+        free(rid_dh);
+        free(rid_cur);
+        free(rid_pre_cur);
+        free(result);
+        return str_data;
     }
 }
 
@@ -1209,6 +1740,7 @@ Text getDataContentWithTag(Data* data, char* tagName){
     if(partial_data==NULL) {
         printf("FAILED >> incorrect tag\n");
         free(mystr);
+        free(partial_result);
         ezxml_free(root);
         return NULL;
     }
@@ -1217,6 +1749,44 @@ Text getDataContentWithTag(Data* data, char* tagName){
     //printf("partial_result: %s\n\n",partial_result);
     free(mystr);
     ezxml_free(root);
+    return partial_result;
+}
+
+Text getDataContentWithTagByID(char* dataID, char* tagName){
+    ObjectBinary* myobj;
+    myobj = getDataContentByID(dataID);
+    
+    if(myobj==NULL)
+        return NULL;
+    
+    char* result;
+    char* partial_result = (char*)malloc(sizeof(char)*(MAX_DIFF_SIZE/2));
+    char* mystr = (char*)malloc(sizeof(char)*(MAX_DIFF_SIZE+20));
+    result = myobj->data;
+    sprintf(mystr,"<root>%s</root>", result);
+    //free(result);
+    ezxml_t root = ezxml_parse_str(mystr,(unsigned long)strlen(mystr)), partial_data;
+    //printf("xml_raw: %s\n",ezxml_toxml(root));
+    
+    partial_data = ezxml_get(root,tagName,-1);
+    if(partial_data==NULL) {
+        printf("FAILED >> incorrect tag\n");
+        free(myobj->data);
+        free(myobj->xmlSchema);
+        free(myobj);
+        free(mystr);
+        free(partial_result);
+        ezxml_free(root);
+        return NULL;
+    }
+    //printf("partial_data: %s\n",partial_data->txt);
+    sprintf(partial_result,"%s",partial_data->txt);
+    //printf("partial_result: %s\n\n",partial_result);
+    free(mystr);
+    ezxml_free(root);
+    free(myobj->data);
+    free(myobj->xmlSchema);
+    free(myobj);
     return partial_result;
 }
 
@@ -1568,7 +2138,9 @@ Text getDataContent(char* schema, char* dataID, char* keyName){
     ezxml_free(root);
     if(check==1){
         //  query
-        return "found";
+        char* partial_result;
+        partial_result = getDataContentWithTagByID(dataID,keyName);
+        return partial_result;
     }
     else{
         printf("not found keyName in xmlSchema\n");
@@ -2018,6 +2590,82 @@ DeviceRef** getDeviceRefList(Data* data){
         devRef[i]->deviceTransportID = strdup(data->content->userDevicePtr[i]->deviceTransportID);
         sprintf(devRef[i]->nodeRefToDataContent,"%s",data->content->userDevicePtr[i]->nodeRefToDataContent);
     }
+    return devRef;
+}
+
+DeviceRef** getDeviceRefListByID(char* dataID){
+    char sql[MAX_SQL_SIZE];
+    char *rid_dh, *result;
+    char *token;
+    
+    printf("--------------------------------------------------[get @rid DataHolder]\n");
+    sprintf(sql,"SELECT @rid from (select expand(out('toDataHolder')) from Data where dataID ='%s')",dataID);
+    printf("SQL: %s\n",sql);
+    rid_dh = getRid(sql);
+    
+    printf("--------------------------------------------------[get @rid lastestCommon]\n");
+    sprintf(sql,"SELECT index_DevRef from #%s",rid_dh);
+    printf("SQL: %s\n",sql);
+    result = getContent(sql);
+    
+    token = strtok(result, ":");
+    token = strtok(NULL, "\n");
+    
+    int index_DevRef = atoi(token);
+    printf("index: %d\n",index_DevRef);
+    
+    if(index_DevRef==0){
+        free(rid_dh);
+        free(result);
+        return NULL;
+    }
+    
+    char* result_data[index_DevRef];
+    char** result_rid;
+    sprintf(sql,"SELECT out from fromDeviceRef where in = #%s",rid_dh);
+    result_rid = getArrayRid(sql);
+    DeviceRef** devRef = (DeviceRef**)malloc(sizeof(DeviceRef*)*index_DevRef+1);
+    
+    int i;
+    for(i=0;i<index_DevRef;i++){
+        sprintf(sql,"SELECT userID,deviceTransportID,nodeRefToDataContent from %s",result_rid[i]);
+        printf("SQL: %s\n",sql);
+        result_data[i] = getContent(sql);
+        printf("result_data[%d]: %s\n",i,result_data[i]);
+        
+        devRef[i] = (DeviceRef*)malloc(sizeof(DeviceRef));
+        
+        token = strtok(result_data[i], "\"");
+        token = strtok(NULL, "\"");
+        //printf("token_inner: %s\n", token);
+        devRef[i]->userID = strdup(token);
+        
+        token = strtok(NULL, "\"");
+        token = strtok(NULL, "\"");
+        //printf("token_inner: %s\n", token);
+        devRef[i]->deviceTransportID = strdup(token);
+        
+        token = strtok(NULL, "\"");
+        token = strtok(NULL, "\"");
+        //printf("token_inner: %s\n", token);
+        
+        sprintf(devRef[i]->nodeRefToDataContent,"%s",token);
+        
+//        printf("\nuserID: %s\n",devRef[i]->userID);
+//        printf("deviceTransportID: %s\n",devRef[i]->deviceTransportID);
+//        printf("nodeRef: %s\n",devRef[i]->nodeRefToDataContent);
+    }
+    devRef[i] = NULL;
+    
+    for(i=0;i<index_DevRef;i++){
+        free(result_rid[i]);
+        free(result_data[i]);
+    }
+    free(result_rid);
+    
+    free(rid_dh);
+    free(result);
+    
     return devRef;
 }
 
@@ -2727,7 +3375,7 @@ void testsetNewDataContent(char* categoryID){
     free(mydata);
     
 }
-//
+
 //void testCountByte(){
 //    char content0[MAX_DIFF_SIZE] = "<book_id>bk100</book_id><author>Gambardella, Matthew</author><title>XML Developer's Guide</title><genre>Computer</genre><price>44.95</price><publish_date>2000-10-01</publish_date><description>An in-depth look at creating applications with XML.</description>";
 //    
@@ -2847,6 +3495,106 @@ void testDraft2(){
     free((char*)uuid_org);
     free((char*)uuid_usr);
     free((char*)uuid_cat);
+}
+
+void testDraft2_ByID(){
+    /*
+     ObjectBinary* myobj;
+     myobj = getDataContentCommonVersionByID("9C7279CFD0FA400E9F41391FE843A075");
+     
+     printf("\n\nxml: %s\n",myobj->xmlSchema);
+     printf("data: %s\n",myobj->data);
+     printf("byteCount: %d\n",myobj->byteCount);
+     
+     free(myobj->xmlSchema);
+     free(myobj->data);
+     free(myobj);
+     */
+    
+    /*
+     ObjectBinary* myobj;
+     myobj = getDataContentByID("A19E592D09344701B6B4504CB1D55DCB");
+     printf("\n\nxml: %s\n",myobj->xmlSchema);
+     printf("data: %s\n",myobj->data);
+     printf("byteCount: %d\n",myobj->byteCount);
+     
+     free(myobj->xmlSchema);
+     free(myobj->data);
+     free(myobj);
+     */
+    
+    //getContent("select byteCount,data,xmlSchema from #22:431");
+    
+    //    ObjectBinary *myobj_next, *myobj_pre;
+    //    myobj_next = getContentNextVerByID("A19E592D09344701B6B4504CB1D55DCB");
+    //    printf("----NEXT----\n");
+    //    if(myobj_next!=NULL){
+    //        printf("\n\nxml: %s\n",myobj_next->xmlSchema);
+    //        printf("data: %s\n",myobj_next->data);
+    //        printf("byteCount: %d\n",myobj_next->byteCount);
+    //
+    //        free(myobj_next->xmlSchema);
+    //        free(myobj_next->data);
+    //        free(myobj_next);
+    //    }
+    //
+    //    printf("----PRE----\n");
+    //    myobj_pre = getContentPreVerByID("A19E592D09344701B6B4504CB1D55DCB");
+    //    if(myobj_pre!=NULL){
+    //        printf("\n\nxml: %s\n",myobj_pre->xmlSchema);
+    //        printf("data: %s\n",myobj_pre->data);
+    //        printf("byteCount: %d\n",myobj_pre->byteCount);
+    //
+    //        free(myobj_pre->xmlSchema);
+    //        free(myobj_pre->data);
+    //        free(myobj_pre);
+    //    }
+    
+//    char *next, *pre;
+//    next = getDiffDataNextVerByID("A19E592D09344701B6B4504CB1D55DCB");
+//    pre = getDiffDataPreVerByID("A19E592D09344701B6B4504CB1D55DCB");
+//    printf("\n\nnext: %s\n",next);
+//    printf("\n\npre: %s\n",pre);
+//    free(next);
+//    free(pre);
+    
+//    char* partial;
+//    partial = getDataContentWithTagByID("A19E592D09344701B6B4504CB1D55DCB","author");
+//    printf("\npartial: %s\n", partial);
+//    if(partial!=NULL)
+//        free(partial);
+    
+//    DeviceRef** devRef;
+//    devRef = getDeviceRefListByID("A19E592D09344701B6B4504CB1D55DCB");
+//    if(devRef!=NULL){
+//        int i;
+//        for(i=0;devRef[i]!=NULL;i++){
+//            printf("\nuserID: %s\n",devRef[i]->userID);
+//            printf("deviceTransportID: %s\n",devRef[i]->deviceTransportID);
+//            printf("nodeRef: %s\n",devRef[i]->nodeRefToDataContent);
+//        
+//            free((char*)devRef[i]->userID);
+//            free((char*)devRef[i]->deviceTransportID);
+//            free(devRef[i]);
+//        }
+//        free(devRef);
+//    }
+    
+    char* partial;
+    partial = getDataContent(NULL,"A19E592D09344701B6B4504CB1D55DCB","author");
+    printf("\npartial: %s\n", partial);
+        if(partial!=NULL)
+            free(partial);
+    
+    /*
+     char *head, *last;
+     last = getDiffDataAtlastestCommonByID("A19E592D09344701B6B4504CB1D55DCB");
+     head = getDiffDataAtheadByID("A19E592D09344701B6B4504CB1D55DCB");
+     printf("\n\nlast: %s\n",last);
+     printf("\n\nhead: %s\n",head);
+     free(head);
+     free(last);
+     */
 }
 
 
