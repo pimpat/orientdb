@@ -141,47 +141,53 @@ ObjectBinary* getDataContentCommonVersion(Data* data);
 ObjectBinary* getDataContent(Data* data);
 ObjectBinary* getDataContentCommonVersionByID(char* dataID);
 ObjectBinary* getDataContentByID(char* dataID);
+
 Text getDiffDataAtlastestCommon(Data* data);
 Text getDiffDataAthead(Data* data);
 Text getDiffDataAtlastestCommonByID(char* dataID);
 Text getDiffDataAtheadByID(char* dataID);
+
 ObjectBinary* getContentNextVer(Data* data);
 ObjectBinary* getContentPreVer(Data* data);
 ObjectBinary* getContentNextVerByID(char* dataID);
 ObjectBinary* getContentPreVerByID(char* dataID);
+
 Text getDiffDataNextVer(Data* data);
 Text getDiffDataPreVer(Data* data);
 Text getDiffDataNextVerByID(char* dataID);
 Text getDiffDataPreVerByID(char* dataID);
+
 int getCurLevelFromlastestCommon(Data* data);
 int getCurLevelFromCommon(Data* data);
+
 Text getDataContentWithTag(Data* data, char* tagName);
 Text getDataContentWithTagByID(char* dataID, char* tagName);
+
 int setNewDataContent(Data* data, char* diffContent);
 int setNewDataDiffWithTag(Data* data, char* tagName, char* diff);
+
 Text getTagContent(ObjectBinary* fullContent, char* tagName);
 Text getTagContent(ObjectBinary* fullContent, int tagNameEnum);
+
 int setTagContent(ObjectBinary* fullContent, Text newTagContent, char* tagName);
+
 const char* createOrg(Text orgName);
 const char* createUser(Text userName);
 const char* createCategory(Text categoryName);
 const char* createData(Text dataName);
+
 Text getDataContent(char* schema, char* dataID, char* keyName);
+
 int addData2Category(char* categoryID, Data* data);
 int addData2CategoryTest(char* categoryID, Data* data);
 int addCategory2User(char* userID, char* categoryID);
 int addUser2Org(char* orgID, char* userID);
 
-//Data* queryDataByID(char* dataID);
-//Category* queryCategoryByID(char* dataID);
-//User *queryUserByID(char* dataID);
+Data* queryDataByID(char* dataID);
+Category** queryCategoryByID(char* dataID);
+User** queryUserByID(char* dataID);
 DeviceRef** getDeviceRefList(Data* data);
 DeviceRef** getDeviceRefListByID(char* dataID);
-
-//  draft #1
-//Data* queryDataByID(char* dataID);
-//Category** queryCategoryByID(char* dataID);
-//User** queryUserByID(char* dataID);
 
 string getDiff(char* old_str, char* new_str);           // pim
 string getPatch(char* str, char* str_patch);            // pim
@@ -196,12 +202,12 @@ void testUserCategory(int x);
 void testTag(Data* data);
 void testsetNewDataContent(char* categoryID);
 void testCountByte();
-void testqueryDataByID(char* myID, char* mycatID);
 void testArrayRid();
 void testqueryCategoryByID(char* myID);
 void testqueryUserByID(char* myID);
 void testDraft2();
 void testDraft2_ByID();
+void testQuery();
 
 int main() {
     int ret;
@@ -231,7 +237,11 @@ int main() {
     //testDraft2();
     //getContent("SELECT xmlSchema,data,byteCount from #22:414");
 
-    testDraft2_ByID();
+    testqueryCategoryByID("A19E592D09344701B6B4504CB1D55DCB");
+    //testqueryUserByID("A19E592D09344701B6B4504CB1D55DCB");
+
+    //testQuery();
+    //testDraft2_ByID();
 
     /* A set for test */
 //    testUserCategory(1);
@@ -2480,6 +2490,313 @@ int addUser2Org(char* orgID, char* userID){
     return ret; //  1 = failed, 0 = success
 }
 
+Data* queryDataByID(char* dataID){
+    char sql[MAX_SQL_SIZE];
+    char *rid_dh;
+    char *result, *result_schema;
+    char *token;
+    
+    printf("--------------------------------------------------[get dataName,chatRoom]\n");
+    sprintf(sql,"SELECT dataName,chatRoom from Data where dataID ='%s'",dataID);
+    printf("SQL: %s\n",sql);
+    result = getContent(sql);
+    
+    if(result==NULL){
+        printf("FAILED >> incorrect dataID\n");
+        return NULL;
+    }
+    
+    Data* d = (Data*)malloc(sizeof(Data));
+    d->dataID = strdup(dataID);
+    
+    token = strtok(result,"\"");
+    token = strtok(NULL,"\"");
+    printf("dataName: %s\n",token);
+    memcpy(d->dataName,token,strlen(token));
+    
+    token = strtok(NULL,"\"");
+    token = strtok(NULL,"\"");
+    printf("chatRoom: %s\n",token);
+    d->chatRoom = strdup(token);
+    free(result);
+    
+    printf("--------------------------------------------------[get @rid DataHolder]\n");
+    sprintf(sql,"SELECT @rid from (select expand(out('toDataHolder')) from Data where dataID ='%s')",dataID);
+    printf("SQL: %s\n",sql);
+    rid_dh = getRid(sql);
+    
+    if(rid_dh == NULL){
+        printf("no DataHolder in this dataID\n");
+        free(rid_dh);
+        return d;
+    }
+    
+    printf("--------------------------------------------------[get versionKeeped,versionCount,index_DevRef]\n");
+    sprintf(sql,"SELECT versionKeeped,versionCount,index_DevRef from #%s",rid_dh);
+    result = getContent(sql);
+    
+    d->content = createNewDataHolder();
+    token = strtok(result,":");
+    token = strtok(NULL,",");
+    printf("ver_keeped: %s\n",token);
+    d->content->versionKeeped = atoi(token);
+    
+    token = strtok(NULL,":");
+    token = strtok(NULL,",");
+    printf("ver_count: %s\n",token);
+    d->content->versionCount = atoi(token);
+    
+    token = strtok(NULL,":");
+    token = strtok(NULL,"\n");
+    printf("index: %s\n",token);
+    d->content->index_DevRef = atoi(token);
+    free(result);
+    
+    int i;
+    int count = d->content->versionCount;
+    char* rid_dc[count];
+    //char* result_dc[count];
+    DataContent *dc[count];
+    for(i=0;i<count;i++){
+        dc[i] = (DataContent*)malloc(sizeof(DataContent));
+        dc[i]->objContent = (ObjectBinary*)malloc(sizeof(ObjectBinary));
+    }
+    
+    printf("--------------------------------------------------[get @rid lastestCommon]\n");
+    sprintf(sql,"SELECT in from (select expand(out_toDataContent) from #%s) where name = 'lastestCommon')",rid_dh);
+    printf("SQL: %s\n",sql);
+    rid_dc[0] = getRid(sql);
+    printf("rid[0]: %s\n",rid_dc[0]);
+    
+    for(i=0;i<count;i++){
+        printf("--------------------------------------------------[get isDiff,byteCount,data]\n");
+        sprintf(sql,"SELECT isDiff,byteCount,data from #%s",rid_dc[i]);
+        printf("SQL: %s\n",sql);
+        result = getContent(sql);
+        
+        token = strtok(result, ":");
+        token = strtok(NULL, ",");
+        
+        if(strcmp(token,"true")==0)
+            dc[i]->isDiff = 1;
+        else
+            dc[i]->isDiff = 0;
+        printf("\nisDiff: %d\n",dc[i]->isDiff);
+        
+        token = strtok(NULL,":");
+        token = strtok(NULL,",");
+        dc[i]->objContent->byteCount = atoi(token);
+        printf("\nbyteCount: %d\n",dc[i]->objContent->byteCount);
+        
+        token = strtok(NULL,"\"");
+        token = strtok(NULL,"\"");
+        dc[i]->objContent->data = strdup(token);
+        printf("\ndata: %s\n",dc[i]->objContent->data);
+        free(result);
+        
+        printf("--------------------------------------------------[get xmlSchema]\n");
+        sprintf(sql,"SELECT xmlSchema from #%s",rid_dc[i]);
+        printf("SQL: %s\n",sql);
+        result_schema = getContent(sql);
+        //printf("result_schema: %s\n",result_schema);
+        char* temp = (char*)malloc(sizeof(char)*MAX_SCHEMA);
+        memcpy(temp,result_schema+11,strlen(result_schema)-11);
+        temp[strlen(temp)-1] = '\0';
+        dc[i]->objContent->xmlSchema = temp;
+        printf("\nxmlSchema: %s\n",dc[i]->objContent->xmlSchema);
+        free(result_schema);
+
+        if(i==0){
+            dc[i]->preVersion = NULL;
+            dc[i]->nextVersion = dc[i+1];
+        }
+        else if(i+1==count){
+            dc[i]->preVersion = dc[i-1];
+            dc[i]->nextVersion = NULL;
+        }
+        else {
+            dc[i]->preVersion = dc[i-1];
+            dc[i]->nextVersion = dc[i+1];
+        }
+        
+        if(i+1!=count){
+            printf("--------------------------------------------------[get @rid DataContent]\n");
+            sprintf(sql,"SELECT in from (select expand(out_toDiffContent) from #%s) where status='next'",rid_dc[i]);
+            //printf("SQL: %s\n",sql);
+            rid_dc[i+1] = getRid(sql);
+            printf("rid[%d]: %s\n",i+1,rid_dc[i+1]);
+        }
+    }
+    
+    // ออกจากลูป แล้วค่อยกำหนด head-last
+    d->content->lastestCommon = dc[0];
+    d->content->head = dc[count-1];
+    
+    // DeviceRef
+    int index = d->content->index_DevRef;
+    for(i=0;i<index;i++){
+        d->content->userDevicePtr[i] = (DeviceRef*)malloc(sizeof(DeviceRef));
+    }
+    
+    char **rid_devRef;
+    sprintf(sql,"SELECT out from fromDeviceRef where in = #%s",rid_dh);
+    rid_devRef = getArrayRid(sql);
+    
+    for(i=0;i<index;i++){
+        sprintf(sql,"SELECT userID,deviceTransportID,nodeRefToDataContent from %s",rid_devRef[i]);
+        printf("SQL: %s\n",sql);
+        result = getContent(sql);
+        printf("result[%d]: %s\n",i,result);
+        
+        token = strtok(result, "\"");
+        token = strtok(NULL, "\"");
+
+        d->content->userDevicePtr[i]->userID = strdup(token);
+        
+        token = strtok(NULL, "\"");
+        token = strtok(NULL, "\"");
+        //printf("token_inner: %s\n", token);
+        d->content->userDevicePtr[i]->deviceTransportID = strdup(token);
+        
+        token = strtok(NULL, "\"");
+        token = strtok(NULL, "\"");
+        //printf("token_inner: %s\n", token);
+        
+        sprintf(d->content->userDevicePtr[i]->nodeRefToDataContent,"%s",token);
+        free(result);
+    }
+    
+    for(i=0;i<index;i++)
+        free(rid_devRef[i]);
+    free(rid_devRef);
+    
+    for(i=0;i<count;i++){
+        free(rid_dc[i]);
+    }
+    free(rid_dh);
+    
+    return d;
+}
+
+Category** queryCategoryByID(char* dataID){
+    char sql[MAX_SQL_SIZE];
+    char* result;
+    char* token;
+    int i, count;
+    
+    sprintf(sql,"SELECT count(*) from (select expand(in('toData')) from Data where dataID='%s')",dataID);
+    //printf("SQL: %s\n",sql);
+    result = getContent(sql);
+    
+    if(result==NULL){
+        printf("FAILED >> incorrect dataID\n");
+        return NULL;
+    }
+    
+    token = strtok(result, ":");
+    token = strtok(NULL, "l");
+    count = atoi(token);
+    printf("count: %d\n",count);
+    
+    Category** catPtr = (Category**)malloc(sizeof(Category*)*count+1);
+    for(i=0;i<count;i++)
+        catPtr[i] = (Category*)malloc(sizeof(Category));
+    
+    char* result_data[count];
+    char** result_rid;
+    sprintf(sql,"SELECT @rid from (select expand(in('toData')) from Data where dataID='%s')",dataID);
+    result_rid = getArrayRid(sql);
+    
+    for(i=0;i<count;i++){
+        sprintf(sql,"SELECT categoryID,categoryName from %s",result_rid[i]);
+        printf("SQL: %s\n",sql);
+        result_data[i] = getContent(sql);
+        token = strtok(result_data[i], "\"");
+        token = strtok(NULL, "\"");
+        //printf("catID: %s\n",token);
+        catPtr[i]->categoryID = strdup(token);
+        token = strtok(NULL, "\"");
+        token = strtok(NULL, "\"");
+        //printf("catName: %s\n",token);
+        sprintf(catPtr[i]->categoryName,"%s",token);
+        
+        printf("\ncatID: %s\n",catPtr[i]->categoryID);
+        printf("catName: %s\n",catPtr[i]->categoryName);
+    }
+    catPtr[i] = NULL;
+    
+    for(i=0;result_rid[i]!=NULL;i++){
+        free(result_rid[i]);
+    }
+    free(result_rid);
+    
+    for(i=0;i<count;i++){
+        free(result_data[i]);
+    }
+    
+    free(result);
+    return catPtr;
+}
+
+User** queryUserByID(char* dataID){
+    char sql[MAX_SQL_SIZE];
+    char* result;
+    char* token;
+    int i, count;
+    
+    sprintf(sql,"SELECT count(*) from (select expand(in('toData').in('toCategory')) from Data where dataID='%s')",dataID);
+    //printf("SQL: %s\n",sql);
+    result = getContent(sql);
+    
+    if(result==NULL){
+        printf("FAILED >> incorrect dataID\n");
+        return NULL;
+    }
+    
+    token = strtok(result, ":");
+    token = strtok(NULL, "l");
+    count = atoi(token);
+    printf("count: %d\n",count);
+    
+    User** usrPtr = (User**)malloc(sizeof(User*)*count+1);
+    for(i=0;i<count;i++)
+        usrPtr[i] = (User*)malloc(sizeof(User));
+    
+    char* result_data[count];
+    char** result_rid;
+    sprintf(sql,"SELECT @rid from (select expand(in('toData').in('toCategory')) from Data where dataID='%s')",dataID);
+    result_rid = getArrayRid(sql);
+    
+    for(i=0;i<count;i++){
+        sprintf(sql,"SELECT userID,userName from %s",result_rid[i]);
+        printf("SQL: %s\n",sql);
+        result_data[i] = getContent(sql);
+        token = strtok(result_data[i], "\"");
+        token = strtok(NULL, "\"");
+        usrPtr[i]->userID = strdup(token);
+        
+        token = strtok(NULL, "\"");
+        token = strtok(NULL, "\"");
+        sprintf(usrPtr[i]->userName,"%s",token);
+        
+        printf("\nuserID: %s\n",usrPtr[i]->userID);
+        printf("userName: %s\n",usrPtr[i]->userName);
+    }
+    usrPtr[i] = NULL;
+    
+    for(i=0;result_rid[i]!=NULL;i++){
+        free(result_rid[i]);
+    }
+    free(result_rid);
+    
+    for(i=0;i<count;i++){
+        free(result_data[i]);
+    }
+    
+    free(result);
+    return usrPtr;
+}
+
 string getDiff(char* old_str, char* new_str){
     //    printf("len old: %lu\n",strlen(old_str));
     //    printf("%s\n",old_str);
@@ -2668,316 +2985,6 @@ DeviceRef** getDeviceRefListByID(char* dataID){
     
     return devRef;
 }
-
-//Data* queryDataByID(char* dataID){
-//    Data* d = (Data*)malloc(sizeof(Data));
-//    char sql[MAX_SQL_SIZE];
-//    char *result;
-//    sprintf(sql,"select chatRoom from Data where dataID = '%s'",dataID);
-//    result = getContent(sql);
-//    
-//    if(result==NULL){
-//        printf("FAILED >> incorrect dataID\n");
-//        free(result);
-//        free(d);
-//        return NULL;
-//    }
-//    printf("\n\n");
-//    //printf("result: %s\n",result);
-//    
-//    char *uuidstr = (char*)malloc(sizeof(char)*33);
-//    memcpy(uuidstr,result+10,strlen(result)-10-1);
-//    uuidstr[32] = '\0';
-//    d->dataID = dataID;
-//    d->chatRoom = uuidstr;
-//    printf("dataID: %s\n",d->dataID);
-//    printf("chatRoom: %s\n",d->chatRoom);
-//
-//    char* rid_dh;
-//    char* result2;
-//    
-//    printf("--------------------------------------------------[get @rid DataHolder]\n");
-//    sprintf(sql,"SELECT @rid from (select expand(out('toDataHolder')) from Data where dataID ='%s')",dataID);
-//    rid_dh = getRid(sql);
-//    
-//    if(rid_dh == NULL){
-//        printf("queryDataByID..FAILED(get @rid DataHolder)\n");
-//        free(result);
-//        free(result2);
-//        free(rid_dh);
-//        free(d);
-//        return NULL;
-//    }
-//    
-//    printf("--------------------------------------------------[get ver,usrCount]\n");
-//    sprintf(sql,"SELECT versionCount,index_DevRef from #%s)",rid_dh);
-//    
-//    result2 = getContent(sql);
-//    
-//    if(result2 == NULL){
-//        printf("queryDataByID..FAILED(get ver,usrCount)\n");
-//        free(result);
-//        free(result2);
-//        free(rid_dh);
-//        free(d);
-//        return NULL;
-//    }
-//    
-//    // หั่น data เอามาใส่ struct
-//    char delim1[2] = ":";
-//    char delim2[2] = ",";
-//    char delim3[2] = "\"";
-//    char* token;
-//    char str[10];
-//    
-//    d->content = createNewDataHolder();
-//    
-//    token = strtok(result2, delim1);
-//    token = strtok(NULL, delim2);
-//    //printf("token1: %s\n", token);
-//    d->content->versionCount = atoi(token);
-//    
-//    token = strtok(NULL, delim1);
-//    token = strtok(NULL, delim1);
-//    //printf("token2: %s\n", token);
-//    d->content->index_DevRef = atoi(token);
-//    printf("ver: %d\nusrCount: %d\n",d->content->versionCount,d->content->index_DevRef);
-//
-//    int i;
-//    int count = d->content->versionCount;
-//    printf("count: %d\n",count);
-//    
-//    DataContent** dcPtr = (DataContent**)malloc(sizeof(DataContent*)*count);
-//    for(i=0;i<count;i++)
-//        dcPtr[i] = (DataContent*)malloc(sizeof(DataContent));
-//    
-//    char* rid_dc[count];
-//    printf("--------------------------------------------------[get @rid 1st DataContent]\n");
-//    sprintf(sql,"SELECT min(@rid) from (select expand(out('toDataContent')) from #%s)",rid_dh);
-//    rid_dc[0] = getRid(sql);
-//    printf("rid[0]: %s\n",rid_dc[0]);
-//    
-//    char* result_dc[count];
-//    
-//    for(i=0;i<count;i++){
-//        printf("--------------------------------------------------[get isDiff,diff DataContent]\n");
-//        sprintf(sql,"SELECT isDiff,diffContent from #%s",rid_dc[i]);
-//        result_dc[i] = getContent(sql);
-//        //printf("result_dc[i]: %s\n---------------------\n",result_dc[i]);
-//        
-//        token = strtok(result_dc[i], delim1);
-//        token = strtok(NULL, delim2);
-//        
-//        if(strcmp(token,"true")==0)
-//            dcPtr[i]->isDiff = 1;
-//        else
-//            dcPtr[i]->isDiff = 0;
-//        
-//        printf("isDiff: %d\n",dcPtr[i]->isDiff);
-//        token = strtok(NULL, "\"");
-//        token = strtok(NULL, "\"");
-//        sprintf(dcPtr[i]->diffContent,"%s",token);
-//        printf("diffContent: %s\n",dcPtr[i]->diffContent);
-//        
-//        if(i==0){
-//            dcPtr[i]->preVersion = NULL;
-//            dcPtr[i]->nextVersion = dcPtr[i+1];
-//        }
-//        else if(i+1==count){
-//            dcPtr[i]->preVersion = dcPtr[i-1];
-//            dcPtr[i]->nextVersion = NULL;
-//        }
-//        else {
-//            dcPtr[i]->preVersion = dcPtr[i-1];
-//            dcPtr[i]->nextVersion = dcPtr[i+1];
-//        }
-//
-//        if(i+1!=count){
-//            printf("--------------------------------------------------[get @rid DataContent]\n");
-//            sprintf(sql,"SELECT max(@rid) from (select expand(out('toDiffContent')) from #%s)",rid_dc[i]);
-//            //printf("SQL: %s\n",sql);
-//            rid_dc[i+1] = getRid(sql);
-//            printf("rid[%d]: %s\n",i+1,rid_dc[i+1]);
-//        }
-//    }
-//    
-//    // ออกจากลูป แล้วค่อยกำหนด lastestCommon-last
-//    d->content->lastestCommon = dcPtr[0];
-//    d->content->head = dcPtr[count-1];
-//    
-//    char* result_data[d->content->index_DevRef];
-//    char** result_rid;
-//    
-//    sprintf(sql,"SELECT out from fromDeviceRef where in = #%s",rid_dh);
-//    result_rid = getArrayRid(sql);
-//    
-//    // DeviceRef
-//    for(i=0;i<d->content->index_DevRef;i++){
-//        sprintf(sql,"SELECT userID,deviceTransportID,nodeRefToDataContent from %s",result_rid[i]);
-//        printf("SQL: %s\n",sql);
-//        result_data[i] = getContent(sql);
-//        printf("result_data[%d]: %s\n",i,result_data[i]);
-//        
-//        d->content->userDevicePtr[i] = (DeviceRef*)malloc(sizeof(DeviceRef));
-//        
-//        token = strtok(result_data[i], delim3);
-//        token = strtok(NULL, delim3);
-//        printf("token_inner: %s\n", token);
-//        d->content->userDevicePtr[i]->userID = strdup(token);
-//        //d->content->userDevicePtr[i]->userID = token; (fix)
-//        
-//        token = strtok(NULL, delim3);
-//        token = strtok(NULL, delim3);
-//        printf("token_inner: %s\n", token);
-//        d->content->userDevicePtr[i]->deviceTransportID = strdup(token);
-//        //d->content->userDevicePtr[i]->deviceTransportID = token;  (fix)
-//        
-//        token = strtok(NULL, delim3);
-//        token = strtok(NULL, delim3);
-//        printf("token_inner: %s\n", token);
-//        
-//        sprintf(d->content->userDevicePtr[i]->nodeRefToDataContent,"%s",token);
-//        
-//        printf("\nuserID: %s\n",d->content->userDevicePtr[i]->userID);
-//        printf("deviceTransportID: %s\n",d->content->userDevicePtr[i]->deviceTransportID);
-//        printf("nodeRef: %s\n",d->content->userDevicePtr[i]->nodeRefToDataContent);
-//    }
-//    
-//    for(i=0;result_rid[i]!=NULL;i++){
-//        free(result_rid[i]);
-//        free(result_data[i]);
-//    }
-//    free(result_rid);
-//
-//    for(i=0;i<count;i++){
-//        //free(dcPtr[i]);
-//        free(result_dc[i]);
-//        free(rid_dc[i]);
-//    }
-//    
-//    free(dcPtr);
-//    free(result);
-//    free(result2);
-//    free(rid_dh);
-//    
-//    return d;
-//}
-
-//Category** queryCategoryByID(char* dataID){
-//    char sql[MAX_SQL_SIZE];
-//    char* count;
-//    char* token;
-//    char delim1[2] = ":";
-//    char delim2[2] = "\"";
-//    int i, num;
-//    
-//    sprintf(sql,"SELECT count(*) from (select expand(in('toData')) from Data where dataID='%s')",dataID);
-//    //printf("SQL: %s\n",sql);
-//    count = getContent(sql);
-//    token = strtok(count, delim1);
-//    //printf("token1: %s\n", token);
-//    token = strtok(NULL, "l");
-//    //printf("token2: %s\n", token);
-//    num = atoi(token);
-//    printf("num: %d\n",num);
-//    
-//    Category** catPtr = (Category**)malloc(sizeof(Category*)*num+1);
-//    for(i=0;i<num;i++)
-//        catPtr[i] = (Category*)malloc(sizeof(Category));
-//    
-//    char* result_data[num];
-//    char** result_rid;
-//    sprintf(sql,"SELECT @rid from (select expand(in('toData')) from Data where dataID='%s')",dataID);
-//    result_rid = getArrayRid(sql);
-//    
-//    for(i=0;i<num;i++){
-//        sprintf(sql,"SELECT categoryID,categoryName from %s",result_rid[i]);
-//        printf("SQL: %s\n",sql);
-//        result_data[i] = getContent(sql);
-//        token = strtok(result_data[i], delim2);
-//        token = strtok(NULL, delim2);
-//        //printf("catID: %s\n",token);
-//        catPtr[i]->categoryID = strdup(token);
-//        //catPtr[i]->categoryID = token;    (fix)
-//        token = strtok(NULL, delim2);
-//        token = strtok(NULL, delim2);
-//        //printf("catName: %s\n",token);
-//        sprintf(catPtr[i]->categoryName,"%s",token);
-//        
-//        printf("\ncatID: %s\n",catPtr[i]->categoryID);
-//        printf("catName: %s\n",catPtr[i]->categoryName);
-//    }
-//    catPtr[i] = NULL;
-//    
-//    for(i=0;result_rid[i]!=NULL;i++){
-//        free(result_rid[i]);
-//    }
-//    free(result_rid);
-//    
-//    for(i=0;i<num;i++){
-//        free(result_data[i]);
-//    }
-//    
-//    free(count);
-//    
-//    return catPtr;
-//}
-
-//User** queryUserByID(char* dataID){
-//    char sql[MAX_SQL_SIZE];
-//    char* count;
-//    char* token;
-//    char delim1[2] = ":";
-//    char delim2[2] = "\"";
-//    int i, num;
-//    
-//    sprintf(sql,"SELECT count(*) from (select expand(in('toData').in('toCategory')) from Data where dataID='%s')",dataID);
-//    //printf("SQL: %s\n",sql);
-//    count = getContent(sql);
-//    token = strtok(count, delim1);
-//    //printf("token1: %s\n", token);
-//    token = strtok(NULL, "l");
-//    //printf("token2: %s\n", token);
-//    num = atoi(token);
-//    printf("num: %d\n",num);
-//    
-//    User** usrPtr = (User**)malloc(sizeof(User*)*num+1);
-//    for(i=0;i<num;i++)
-//        usrPtr[i] = (User*)malloc(sizeof(User));
-//    
-//    char* result_data[num];
-//    char** result_rid;
-//    sprintf(sql,"SELECT @rid from (select expand(in('toData').in('toCategory')) from Data where dataID='%s')",dataID);
-//    result_rid = getArrayRid(sql);
-//    
-//    for(i=0;i<num;i++){
-//        sprintf(sql,"SELECT userID,userName from %s",result_rid[i]);
-//        printf("SQL: %s\n",sql);
-//        result_data[i] = getContent(sql);
-//        token = strtok(result_data[i], delim2);
-//        token = strtok(NULL, delim2);
-//        usrPtr[i]->userID = strdup(token);
-//        //usrPtr[i]->userID = token;
-//        token = strtok(NULL, delim2);
-//        token = strtok(NULL, delim2);
-//        sprintf(usrPtr[i]->userName,"%s",token);
-////        printf("\nuserID: %s\n",usrPtr[i]->userID);
-////        printf("userName: %s\n",usrPtr[i]->userName);
-//    }
-//    usrPtr[i] = NULL;
-//    
-//    for(i=0;result_rid[i]!=NULL;i++){
-//        free(result_rid[i]);
-//    }
-//    free(result_rid);
-//    
-//    for(i=0;i<num;i++){
-//        free(result_data[i]);
-//    }
-//    free(count);
-//    
-//    return usrPtr;
-//}
 
 //----------------------------------------------------------------------------------------------------------
 
@@ -3388,37 +3395,6 @@ void testsetNewDataContent(char* categoryID){
 //    
 //}
 //
-//void testqueryDataByID(char* myID, char* mycatID){
-//    Data* data = queryDataByID(myID);
-//    addDataToCategory(mycatID,data);
-//
-//    int i, count;
-//    count = data->content->index_DevRef;
-//    printf("count: %d\n",count);
-//    
-//    for(i=0;i<count;i++){
-//        printf("\nuserID: %s\n",data->content->userDevicePtr[i]->userID);
-//        printf("deviceTransportID: %s\n",data->content->userDevicePtr[i]->deviceTransportID);
-//        printf("nodeRef: %s\n",data->content->userDevicePtr[i]->nodeRefToDataContent);
-//        free((char*)data->content->userDevicePtr[i]->userID);
-//        free((char*)data->content->userDevicePtr[i]->deviceTransportID);
-//        free(data->content->userDevicePtr[i]);
-//    }
-//
-//    if(data!=NULL){
-//        DataContent *mydc, *next_mydc;
-//        for(mydc=data->content->lastestCommon;mydc!=NULL;mydc=next_mydc){
-//            next_mydc = mydc->nextVersion;
-//            free(mydc);
-//        }
-//
-//        //free((char*)data->dataID);
-//        free(data->content);
-//        free((char*)data->chatRoom);
-//        free(data);
-//    }
-//}
-//
 //void testArrayRid(){
 //    char** result_rid;
 //    result_rid = getArrayRid("select in from toDataContent where out = #17:16");
@@ -3432,35 +3408,35 @@ void testsetNewDataContent(char* categoryID){
 //    }
 //    free(result_rid);
 //}
-//
-//void testqueryCategoryByID(char* myID){
-//    Category** mycat;
-//    mycat = queryCategoryByID(myID);
-//    printf("\n[test]\n");
-//    int i;
-//    for(i=0;mycat[i]!=NULL;i++){
-//        printf("catID: %s\n",mycat[i]->categoryID);
-//        printf("catName: %s\n",mycat[i]->categoryName);
-//        free((char*)mycat[i]->categoryID);
-//        free(mycat[i]);
-//    }
-//    free(mycat);
-//    
-//}
-//
-//void testqueryUserByID(char* myID){
-//    User** myusr;
-//    myusr = queryUserByID(myID);
-//    printf("\n[test]\n");
-//    int i;
-//    for(i=0;myusr[i]!=NULL;i++){
-//        printf("userID: %s\n",myusr[i]->userID);
-//        printf("userName: %s\n",myusr[i]->userName);
-//        free((char*)myusr[i]->userID);
-//        free(myusr[i]);
-//    }
-//    free(myusr);
-//}
+
+void testqueryCategoryByID(char* myID){
+    Category** mycat;
+    mycat = queryCategoryByID(myID);
+    printf("\n[test]\n");
+    int i;
+    for(i=0;mycat[i]!=NULL;i++){
+        printf("catID: %s\n",mycat[i]->categoryID);
+        printf("catName: %s\n",mycat[i]->categoryName);
+        free((char*)mycat[i]->categoryID);
+        free(mycat[i]);
+    }
+    free(mycat);
+    
+}
+
+void testqueryUserByID(char* myID){
+    User** myusr;
+    myusr = queryUserByID(myID);
+    printf("\n[test]\n");
+    int i;
+    for(i=0;myusr[i]!=NULL;i++){
+        printf("userID: %s\n",myusr[i]->userID);
+        printf("userName: %s\n",myusr[i]->userName);
+        free((char*)myusr[i]->userID);
+        free(myusr[i]);
+    }
+    free(myusr);
+}
 
 void testDraft2(){
     const char* uuid_org;
@@ -3580,11 +3556,11 @@ void testDraft2_ByID(){
 //        free(devRef);
 //    }
     
-    char* partial;
-    partial = getDataContent(NULL,"A19E592D09344701B6B4504CB1D55DCB","author");
-    printf("\npartial: %s\n", partial);
-        if(partial!=NULL)
-            free(partial);
+//    char* partial;
+//    partial = getDataContent(NULL,"A19E592D09344701B6B4504CB1D55DCB","author");
+//    printf("\npartial: %s\n", partial);
+//        if(partial!=NULL)
+//            free(partial);
     
     /*
      char *head, *last;
@@ -3595,6 +3571,64 @@ void testDraft2_ByID(){
      free(head);
      free(last);
      */
+}
+
+void testQuery(){
+    Data* mydata;
+    mydata = queryDataByID("A19E592D09344701B6B4504CB1D55DCB");
+    
+    /* Print for check all data */
+    printf("\n-..-..-..-..-..-..-..-..-..-..-..-..-..-..-..-..-..-..-..-..-..-..-..-..-\n");
+    
+    //  Data
+    printf("dataID: %s\n",mydata->dataID);
+    printf("dataName: %s\n",mydata->dataName);
+    printf("chatRoom: %s\n",mydata->chatRoom);
+    
+    //  DataHolder
+    printf("ver_keeped: %d\n",mydata->content->versionKeeped);
+    printf("ver_count: %d\n",mydata->content->versionCount);
+    printf("index: %d\n",mydata->content->index_DevRef);
+    
+    //  DataContent
+    DataContent *mydc, *next_mydc;
+    for(mydc=mydata->content->lastestCommon;mydc!=NULL;mydc=next_mydc){
+        next_mydc = mydc->nextVersion;
+        printf("isDiff: %d\n",mydc->isDiff);
+        printf("byteCount: %d\n",mydc->objContent->byteCount);
+        printf("xml: %s\n",mydc->objContent->xmlSchema);
+        printf("data: %s\n",mydc->objContent->data);
+    }
+    
+    //  DeviceRef
+    int j;
+    for(j=0;j<mydata->content->index_DevRef;j++){
+        printf("userID: %s\n",mydata->content->userDevicePtr[j]->userID);
+        printf("deviceTransportID: %s\n",mydata->content->userDevicePtr[j]->deviceTransportID);
+        printf("nodeRef: %s\n",mydata->content->userDevicePtr[j]->nodeRefToDataContent);
+    }
+    
+    printf("\n-..-..-..-..-..-..-..-..-..-..-..-..-..-..-..-..-..-..-..-..-..-..-..-..-\n");
+    
+    //  free all data
+    for(j=0;j<mydata->content->index_DevRef;j++){
+        free((char*)mydata->content->userDevicePtr[j]->deviceTransportID);
+        free((char*)mydata->content->userDevicePtr[j]->userID);
+        free((char*)mydata->content->userDevicePtr[j]);;
+    }
+    
+    for(mydc=mydata->content->lastestCommon;mydc!=NULL;mydc=next_mydc){
+        next_mydc = mydc->nextVersion;
+        free(mydc->objContent->xmlSchema);
+        free(mydc->objContent->data);
+        free(mydc->objContent);
+        free(mydc);
+    }
+    
+    free(mydata->content);
+    free((char*)mydata->dataID);
+    free((char*)mydata->chatRoom);
+    free(mydata);
 }
 
 
