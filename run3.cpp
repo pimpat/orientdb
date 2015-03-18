@@ -157,8 +157,8 @@ Text getDiffDataPreVer(Data* data);
 Text getDiffDataNextVerByID(char* dataID);
 Text getDiffDataPreVerByID(char* dataID);
 
-int getCurLevelFromlastestCommon(Data* data);
 int getCurLevelFromCommon(Data* data);
+int getCurLevelFromHead(Data* data);
 
 Text getDataContentWithTag(Data* data, char* tagName);
 Text getDataContentWithTagByID(char* dataID, char* tagName);
@@ -196,18 +196,18 @@ char* getDataContentLast(Data* data);                   // pim
 char* getDataContentVer(Data* data,int ver);            // pim
 
 /* Test Pim */
-int testUUID(uuid_t* uuid);
-void testDMP();
-void testUserCategory(int x);
+//int testUUID(uuid_t* uuid);
+//void testDMP();
+//void testUserCategory(int x);
 void testTag(Data* data);
 void testsetNewDataContent(char* categoryID);
-void testCountByte();
-void testArrayRid();
+//void testCountByte();
+//void testArrayRid();
 void testqueryCategoryByID(char* myID);
 void testqueryUserByID(char* myID);
 void testDraft2();
 void testDraft2_ByID();
-void testQuery();
+void testqueryDataByID();
 
 int main() {
     int ret;
@@ -223,7 +223,7 @@ int main() {
         printf ("error openDatabase\n");
         return 1;
     }
-    
+
     //testUUID(uuid);
     //testDMP();
     //testUserCategory();
@@ -237,13 +237,14 @@ int main() {
     //testDraft2();
     //getContent("SELECT xmlSchema,data,byteCount from #22:414");
 
+//  Test Draft II --------------------------------------------------------------
     testqueryCategoryByID("A19E592D09344701B6B4504CB1D55DCB");
-    //testqueryUserByID("A19E592D09344701B6B4504CB1D55DCB");
-
-    //testQuery();
-    //testDraft2_ByID();
-
-    /* A set for test */
+//    testqueryUserByID("A19E592D09344701B6B4504CB1D55DCB");
+//    testqueryDataByID();
+//    testDraft2_ByID();
+//------------------------------------------------------------------------------
+    
+//  Test Draft I ---------------------------------------------------------------
 //    testUserCategory(1);
 //    testUserCategory(2);
 //    
@@ -267,7 +268,7 @@ int main() {
 //
 //    free(myID);
 //    free(mycatID);
-    /*----------------*/
+//------------------------------------------------------------------------------
     
     //queryRecord("select out from fromDeviceRef where in = #17:16");
     //queryRecord("select in from toDataContent where out = #17:16");
@@ -1691,7 +1692,7 @@ Text getDiffDataPreVerByID(char* dataID){
     }
 }
 
-int getCurLevelFromlastestCommon(Data* data){
+int getCurLevelFromCommon(Data* data){
 //    data->content->current = data->content->lastestCommon;
 //    data->content->current = NULL;
     char addr_curr[20],addr_point[20];
@@ -1714,7 +1715,7 @@ int getCurLevelFromlastestCommon(Data* data){
     return -1;   // -1 = not found
 }
 
-int getCurLevelFromCommon(Data* data){
+int getCurLevelFromHead(Data* data){
 //    data->content->current = data->content->lastestCommon;
     char addr_curr[20],addr_point[20];
     printf("@current: %p\n",data->content->current);
@@ -3204,9 +3205,7 @@ void testsetNewDataContent(char* categoryID){
     
     result[9] = getDataContentLast(mydata);
     printf("result[last]: %s\n\n",result[9]);
-    
-//    addDataToCategory((char*)uuid_cat,mydata);
-//    
+  
     char* partial_result;
     partial_result = getDataContentWithTag(mydata,"genre");
     printf("partial_result(from tag): %s\n\n",partial_result);
@@ -3226,18 +3225,19 @@ void testsetNewDataContent(char* categoryID){
     addCategory2User((char*)uuid_usr2,(char*)uuid_cat2);
     addData2CategoryTest((char*)uuid_cat2,mydata);
     
+//  getDeviceRefList -----------------------------------------------------------
     DeviceRef** devRef;
     devRef = getDeviceRefList(mydata);
     
-    printf("===== DevRef =====\n");
+    printf("===== DeviceRefList =====\n");
     int j;
     for(j=0;j<mydata->content->index_DevRef;j++){
         printf("userID: %s\n",devRef[j]->userID);
         printf("deviceTransportID: %s\n",devRef[j]->deviceTransportID);
         printf("nodeRef: %s\n",devRef[j]->nodeRefToDataContent);
     }
-    //  free devRef!!
     
+    //  free devRef!!
     for(j=0;j<mydata->content->index_DevRef;j++){
         free((char*)mydata->content->userDevicePtr[j]->deviceTransportID);
         free((char*)mydata->content->userDevicePtr[j]->userID);
@@ -3248,113 +3248,100 @@ void testsetNewDataContent(char* categoryID){
         free((char*)devRef[j]);
     }
     free(devRef);
-    
-//    int j;
-//    for(j=0;j<10;j++){
-//        mydata->content->userDevicePtr[j] = (DeviceRef*)malloc(sizeof(DeviceRef));
-//        mydata->content->userDevicePtr[j]->test_num = j;
-//        printf("test_num[%d]: %d\n",j,mydata->content->userDevicePtr[j]->test_num);
-//        
-//    }
-    
-    //  Test getCurLevelFromlastestCommon/Common
-/*
+//------------------------------------------------------------------------------
+
     printf("xmlSchema: %s\n\n",mydata->content->lastestCommon->objContent->xmlSchema);
     
-    int check;
-    check = getCurLevelFromlastestCommon(mydata);
-    printf("lastestCommon: %d\n\n",check);
-    check = getCurLevelFromCommon(mydata);
-    printf("common: %d\n",check);
-*/
+//  getCurLevelFromCommon/Common ----------------------------------------
+//    int check;
+//    check = getCurLevelFromCommon(mydata);
+//    printf("lastestCommon: %d\n\n",check);
+//    check = getCurLevelFromHead(mydata);
+//    printf("common: %d\n",check);
+//------------------------------------------------------------------------------
+
+//  getDiffDataAtlastestCommon/head + getDiffDataPre/NextVer -------------------
+//    char* temp;
+//    temp = getDiffDataAtlastestCommon(mydata);
+//    printf("lastestCommon: %s\n",temp);
+//    temp = getDiffDataAthead(mydata);
+//    printf("last: %s\n",temp);
+//    
+//    int j;
+//    for(j=0;j<9;j++){
+//        temp = getDiffDataPreVer(mydata);
+//        if(temp!=NULL)
+//            printf("data(pre): %s\n",temp);
+//    }
+//    for(j=0;j<9;j++){
+//        temp = getDiffDataNextVer(mydata);
+//        if(temp!=NULL)
+//            printf("data(next): %s\n",temp);
+//    }
+//    
+////    mydata->content->current = mydata->content->current->preVersion;
+////    temp = getDiffDataNextVer(mydata);
+////    printf("next: %s\n",temp);
+////    temp = getDiffDataPreVer(mydata);
+////    printf("pre: %s\n",temp);
+//------------------------------------------------------------------------------
     
-    //  Test getDiff lastestCommon/Last/Next/Pre
-/*
-    char* temp;
-    temp = getDiffDataAtlastestCommon(mydata);
-    printf("lastestCommon: %s\n",temp);
-    temp = getDiffDataAthead(mydata);
-    printf("last: %s\n",temp);
-    
-    int j;
-    for(j=0;j<9;j++){
-        temp = getDiffDataPreVer(mydata);
-        if(temp!=NULL)
-            printf("data(pre): %s\n",temp);
-    }
-    for(j=0;j<9;j++){
-        temp = getDiffDataNextVer(mydata);
-        if(temp!=NULL)
-            printf("data(next): %s\n",temp);
-    }
-    
-//    mydata->content->current = mydata->content->current->preVersion;
-//    temp = getDiffDataNextVer(mydata);
-//    printf("next: %s\n",temp);
-//    temp = getDiffDataPreVer(mydata);
-//    printf("pre: %s\n",temp);
-    
-*/
-    
-    //  Test getContentPre/NextVer
-/*
-    ObjectBinary* myobj[20];
-    int used=0;
-    int j;
-    for(j=0;j<9;j++){
-        myobj[used] = getContentPreVer(mydata);
-        if(myobj[used]!=NULL){
-            printf("data(pre): %s\n",myobj[used]->data);
-            used++;
-        }
-    }
-    for(j=0;j<9;j++){
-        myobj[used] = getContentNextVer(mydata);
-        if(myobj[used]!=NULL){
-            printf("data(next): %s\n",myobj[used]->data);
-            used++;
-        }
-    }
-    printf("used: %d\n",used);
-    
-    for(j=0;j<used;j++){
-        free(myobj[j]->data);
-        free(myobj[j]->xmlSchema);
-        free(myobj[j]);
-    }
-*/
-    
-    //  Test getDataContent/Commonversion
-/*
-    ObjectBinary* obj_temp;
-    ObjectBinary* obj_temp2;
-    obj_temp = getDataContent(mydata);
-    printf("xmlSchema: %s\n",obj_temp->xmlSchema);
-    printf("byteCount: %d\n",obj_temp->byteCount);
-    printf("data: %s\n",obj_temp->data);
-    
-    printf("\ntest_current: %s\n",mydata->content->current->objContent->data);
-    printf("test_current(byte): %d\n",mydata->content->current->objContent->byteCount);
-    
-    free(obj_temp->xmlSchema);
-    free(obj_temp->data);
-    free(obj_temp);
-    
-    obj_temp2 = getDataContentCommonVersion(mydata);
-    printf("xmlSchema: %s\n",obj_temp2->xmlSchema);
-    printf("byteCount: %d\n",obj_temp2->byteCount);
-    printf("data: %s\n",obj_temp2->data);
-    
-    free(obj_temp2->xmlSchema);
-    free(obj_temp2->data);
-    free(obj_temp2);
-*/
+//  getContentPre/NextVer ------------------------------------------------------
+//    ObjectBinary* myobj[20];
+//    int used=0;
+//    int j;
+//    for(j=0;j<9;j++){
+//        myobj[used] = getContentPreVer(mydata);
+//        if(myobj[used]!=NULL){
+//            printf("data(pre): %s\n",myobj[used]->data);
+//            used++;
+//        }
+//    }
+//    for(j=0;j<9;j++){
+//        myobj[used] = getContentNextVer(mydata);
+//        if(myobj[used]!=NULL){
+//            printf("data(next): %s\n",myobj[used]->data);
+//            used++;
+//        }
+//    }
+//    printf("used: %d\n",used);
+//    
+//    for(j=0;j<used;j++){
+//        free(myobj[j]->data);
+//        free(myobj[j]->xmlSchema);
+//        free(myobj[j]);
+//    }
+//------------------------------------------------------------------------------
+
+//  getDataContent/Commonversion -----------------------------------------------
+//    ObjectBinary* obj_temp;
+//    ObjectBinary* obj_temp2;
+//    obj_temp = getDataContent(mydata);
+//    printf("xmlSchema: %s\n",obj_temp->xmlSchema);
+//    printf("byteCount: %d\n",obj_temp->byteCount);
+//    printf("data: %s\n",obj_temp->data);
+//    
+//    printf("\ntest_current: %s\n",mydata->content->current->objContent->data);
+//    printf("test_current(byte): %d\n",mydata->content->current->objContent->byteCount);
+//    
+//    free(obj_temp->xmlSchema);
+//    free(obj_temp->data);
+//    free(obj_temp);
+//    
+//    obj_temp2 = getDataContentCommonVersion(mydata);
+//    printf("xmlSchema: %s\n",obj_temp2->xmlSchema);
+//    printf("byteCount: %d\n",obj_temp2->byteCount);
+//    printf("data: %s\n",obj_temp2->data);
+//    
+//    free(obj_temp2->xmlSchema);
+//    free(obj_temp2->data);
+//    free(obj_temp2);
+//------------------------------------------------------------------------------
 
     int i;
     for(i=0;i<10;i++){
         //if(i!=8)
         free(result[i]);
-        //free(mydata->content->userDevicePtr[i]);
     }
     free(result);
 
@@ -3374,13 +3361,10 @@ void testsetNewDataContent(char* categoryID){
         free(mydc);
     }
     
-    //free(next_mydc);
-    //free(mydc);
     free(mydata->content);
     free((char*)mydata->dataID);
     free((char*)mydata->chatRoom);
     free(mydata);
-    
 }
 
 //void testCountByte(){
@@ -3451,6 +3435,11 @@ void testDraft2(){
     addCategory2User((char*)uuid_usr,(char*)uuid_cat);
     testsetNewDataContent((char*)uuid_cat);
     
+    free((char*)uuid_org);
+    free((char*)uuid_usr);
+    free((char*)uuid_cat);
+
+//  getTagContent(2) + setTagContent -------------------------------------------
 //    char content7[MAX_DIFF_SIZE] = "<book_id>bk107</book_id><author>Knorr, Stefan</author><title>Creepy Crawlies</title><genre>Horror</genre><price>4.95</price><publish_date>2000-12-06</publish_date><description>An anthology of horror stories about roaches, centipedes, scorpions and other insects.</description>";
 //    
 //    ObjectBinary* myobj = (ObjectBinary*)malloc(sizeof(ObjectBinary));
@@ -3467,65 +3456,64 @@ void testDraft2(){
 //    free(result);
 //    free(myobj->data);
 //    free(myobj);
-    
-    free((char*)uuid_org);
-    free((char*)uuid_usr);
-    free((char*)uuid_cat);
+//------------------------------------------------------------------------------
 }
 
 void testDraft2_ByID(){
-    /*
-     ObjectBinary* myobj;
-     myobj = getDataContentCommonVersionByID("9C7279CFD0FA400E9F41391FE843A075");
-     
-     printf("\n\nxml: %s\n",myobj->xmlSchema);
-     printf("data: %s\n",myobj->data);
-     printf("byteCount: %d\n",myobj->byteCount);
-     
-     free(myobj->xmlSchema);
-     free(myobj->data);
-     free(myobj);
-     */
     
-    /*
-     ObjectBinary* myobj;
-     myobj = getDataContentByID("A19E592D09344701B6B4504CB1D55DCB");
-     printf("\n\nxml: %s\n",myobj->xmlSchema);
-     printf("data: %s\n",myobj->data);
-     printf("byteCount: %d\n",myobj->byteCount);
-     
-     free(myobj->xmlSchema);
-     free(myobj->data);
-     free(myobj);
-     */
+//  getDataContentCommonVersionByID --------------------------------------------
+//     ObjectBinary* myobj;
+//     myobj = getDataContentCommonVersionByID("9C7279CFD0FA400E9F41391FE843A075");
+//     
+//     printf("\n\nxml: %s\n",myobj->xmlSchema);
+//     printf("data: %s\n",myobj->data);
+//     printf("byteCount: %d\n",myobj->byteCount);
+//     
+//     free(myobj->xmlSchema);
+//     free(myobj->data);
+//     free(myobj);
+//------------------------------------------------------------------------------
+
+//  getDataContentByID ---------------------------------------------------------
+//     ObjectBinary* myobj;
+//     myobj = getDataContentByID("A19E592D09344701B6B4504CB1D55DCB");
+//     printf("\n\nxml: %s\n",myobj->xmlSchema);
+//     printf("data: %s\n",myobj->data);
+//     printf("byteCount: %d\n",myobj->byteCount);
+//     
+//     free(myobj->xmlSchema);
+//     free(myobj->data);
+//     free(myobj);
+//------------------------------------------------------------------------------
     
-    //getContent("select byteCount,data,xmlSchema from #22:431");
+//  getContentNext/PreVerByID --------------------------------------------------
+//    ObjectBinary *myobj_next, *myobj_pre;
+//    myobj_next = getContentNextVerByID("A19E592D09344701B6B4504CB1D55DCB");
+//    printf("----NEXT----\n");
+//    if(myobj_next!=NULL){
+//        printf("\n\nxml: %s\n",myobj_next->xmlSchema);
+//        printf("data: %s\n",myobj_next->data);
+//        printf("byteCount: %d\n",myobj_next->byteCount);
+//    
+//        free(myobj_next->xmlSchema);
+//        free(myobj_next->data);
+//        free(myobj_next);
+//    }
+//
+//    printf("----PRE----\n");
+//    myobj_pre = getContentPreVerByID("A19E592D09344701B6B4504CB1D55DCB");
+//    if(myobj_pre!=NULL){
+//        printf("\n\nxml: %s\n",myobj_pre->xmlSchema);
+//        printf("data: %s\n",myobj_pre->data);
+//        printf("byteCount: %d\n",myobj_pre->byteCount);
+//    
+//        free(myobj_pre->xmlSchema);
+//        free(myobj_pre->data);
+//        free(myobj_pre);
+//    }
+//------------------------------------------------------------------------------
     
-    //    ObjectBinary *myobj_next, *myobj_pre;
-    //    myobj_next = getContentNextVerByID("A19E592D09344701B6B4504CB1D55DCB");
-    //    printf("----NEXT----\n");
-    //    if(myobj_next!=NULL){
-    //        printf("\n\nxml: %s\n",myobj_next->xmlSchema);
-    //        printf("data: %s\n",myobj_next->data);
-    //        printf("byteCount: %d\n",myobj_next->byteCount);
-    //
-    //        free(myobj_next->xmlSchema);
-    //        free(myobj_next->data);
-    //        free(myobj_next);
-    //    }
-    //
-    //    printf("----PRE----\n");
-    //    myobj_pre = getContentPreVerByID("A19E592D09344701B6B4504CB1D55DCB");
-    //    if(myobj_pre!=NULL){
-    //        printf("\n\nxml: %s\n",myobj_pre->xmlSchema);
-    //        printf("data: %s\n",myobj_pre->data);
-    //        printf("byteCount: %d\n",myobj_pre->byteCount);
-    //
-    //        free(myobj_pre->xmlSchema);
-    //        free(myobj_pre->data);
-    //        free(myobj_pre);
-    //    }
-    
+//  getDiffDataNext/PreVerByID -------------------------------------------------
 //    char *next, *pre;
 //    next = getDiffDataNextVerByID("A19E592D09344701B6B4504CB1D55DCB");
 //    pre = getDiffDataPreVerByID("A19E592D09344701B6B4504CB1D55DCB");
@@ -3533,13 +3521,17 @@ void testDraft2_ByID(){
 //    printf("\n\npre: %s\n",pre);
 //    free(next);
 //    free(pre);
+//------------------------------------------------------------------------------
     
+//  getDataContentWithTagByID --------------------------------------------------
 //    char* partial;
 //    partial = getDataContentWithTagByID("A19E592D09344701B6B4504CB1D55DCB","author");
 //    printf("\npartial: %s\n", partial);
 //    if(partial!=NULL)
 //        free(partial);
+//------------------------------------------------------------------------------
     
+//  getDeviceRefListByID -------------------------------------------------------
 //    DeviceRef** devRef;
 //    devRef = getDeviceRefListByID("A19E592D09344701B6B4504CB1D55DCB");
 //    if(devRef!=NULL){
@@ -3555,25 +3547,29 @@ void testDraft2_ByID(){
 //        }
 //        free(devRef);
 //    }
+//------------------------------------------------------------------------------
     
+//  getDataContent -------------------------------------------------------------
 //    char* partial;
 //    partial = getDataContent(NULL,"A19E592D09344701B6B4504CB1D55DCB","author");
 //    printf("\npartial: %s\n", partial);
 //        if(partial!=NULL)
 //            free(partial);
+//------------------------------------------------------------------------------
     
-    /*
-     char *head, *last;
-     last = getDiffDataAtlastestCommonByID("A19E592D09344701B6B4504CB1D55DCB");
-     head = getDiffDataAtheadByID("A19E592D09344701B6B4504CB1D55DCB");
-     printf("\n\nlast: %s\n",last);
-     printf("\n\nhead: %s\n",head);
-     free(head);
-     free(last);
-     */
+//  getDiffDataAtlastestCommon/headByID ----------------------------------------
+//    char *head, *last;
+//    last = getDiffDataAtlastestCommonByID("A19E592D09344701B6B4504CB1D55DCB");
+//    head = getDiffDataAtheadByID("A19E592D09344701B6B4504CB1D55DCB");
+//    printf("\n\nlast: %s\n",last);
+//    printf("\n\nhead: %s\n",head);
+//    free(head);
+//    free(last);
+//------------------------------------------------------------------------------
+    
 }
 
-void testQuery(){
+void testqueryDataByID(){
     Data* mydata;
     mydata = queryDataByID("A19E592D09344701B6B4504CB1D55DCB");
     
