@@ -54,6 +54,17 @@ typedef struct Rid{
     char rid[20];
 } Rid;
 
+enum FUNCTYPE{
+    createOrg,
+    createUser,
+    createCategory,
+    createData,
+    addData2Category,
+    addData2CategoryTest,
+    addCategory2User,
+    addUser2Org
+};
+
 typedef char* Text;
 typedef struct ObjectBinary {
     Text xmlSchema;
