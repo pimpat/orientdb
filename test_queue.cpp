@@ -55,14 +55,14 @@ typedef struct Rid{
 } Rid;
 
 enum FUNCTYPE{
-    createOrg,
-    createUser,
-    createCategory,
-    createData,
-    addData2Category,
-    addData2CategoryTest,
-    addCategory2User,
-    addUser2Org
+    _createOrg,
+    _createUser,
+    _createCategory,
+    _createData,
+    _addData2Category,
+    _addData2CategoryTest,
+    _addCategory2User,
+    _addUser2Org
 };
 
 typedef char* Text;
@@ -206,6 +206,52 @@ char* getDataContentFirst(Data* data);                  // pim
 char* getDataContentLast(Data* data);                   // pim
 char* getDataContentVer(Data* data,int ver);            // pim
 
+enum ElementType{
+    et_ObjectBinary,    // *
+    et_Text,
+    et_const_char,      // *
+    et_int,
+    et_Data,            // *
+    et_Category,        // **
+    et_User,            // **
+    et_DeviceRef        // **
+};
+
+typedef struct Element {
+    int type;
+    union {
+        ObjectBinary* myObjBin;
+        Text myText;
+        const char* myID;
+        int myNum;
+        Data* myData;
+        Category** myCatPtr;
+        User** myUserPtr;
+        DeviceRef** myDeviceArr;
+    };
+} Element;
+
+typedef struct Node Node;
+struct Node{
+    Node* next;
+    Data* data;
+    char* str;
+    int funcType;
+};
+
+typedef struct Queue {
+    Node* head;
+    Node* tail;
+    int size;
+} Queue;
+
+int writeData2PersistentQ(Queue* queue, Data* data, int funcType, char* str);
+const char* flushData(Queue* queue);
+int isDataEmpty(Queue* queue);
+Queue* createQueue();
+void freeQueue(Queue* queue);
+void copyData(Data* dest, Data* src);
+
 /* Test Pim */
 //int testUUID(uuid_t* uuid);
 //void testDMP();
@@ -219,12 +265,13 @@ void testqueryUserByID(char* myID);
 void testDraft2();
 void testDraft2_ByID();
 void testqueryDataByID();
+void testElement();
 
 int main() {
     int ret;
     int size;
 
-    prepareDB();  // include connectServer()
+    //prepareDB();  // include connectServer()
     
     Sockfd = connectSocket();
     if (Sockfd < 0) return Sockfd;
@@ -249,10 +296,12 @@ int main() {
     //getContent("SELECT xmlSchema,data,byteCount from #22:414");
 
 //  Test Draft II --------------------------------------------------------------
-    testqueryCategoryByID("A19E592D09344701B6B4504CB1D55DCB");
+    //testqueryCategoryByID("A19E592D09344701B6B4504CB1D55DCB");
 //    testqueryUserByID("A19E592D09344701B6B4504CB1D55DCB");
 //    testqueryDataByID();
 //    testDraft2_ByID();
+//    testDraft2();
+    testElement();
 //------------------------------------------------------------------------------
     
 //  Test Draft I ---------------------------------------------------------------
@@ -2212,6 +2261,11 @@ int addData2Category(char* categoryID, Data* data){
         printf("addData2Category..FAILED(edge_toDataHolder)\n");
     
     //  DataContent
+    char addr_curr[20],addr_point[20];
+    printf("@current: %p\n",data->content->current);
+    sprintf(addr_curr,"%p",data->content->current);
+    
+    
     DataContent *dc, *next_dc;
     short cltid_lastestCommon, cltid_last, cltid_tmp;
     long rid_lastestCommon, rid_last, rid_tmp;
@@ -2226,6 +2280,21 @@ int addData2Category(char* categoryID, Data* data){
             printf("addData2Category..FAILED(vertex_DataContent)\n");
             return -1;
         }
+        
+        //  current
+        printf("@mydc #%d: %p\n",i,dc);
+        sprintf(addr_point,"%p",dc);
+        if(strcmp(addr_curr,addr_point)==0){
+            printf("--------------------------------------------------[create_edge_toDataContent_current]\n");
+            sprintf(sql,"CREATE EDGE toDataContent from #%d:%lu to #%d:%lu set name='current'",cltid_dh,rid_dh,cltid_last,rid_last);
+            ret = sendCommand(sql);
+            if (ret!=0){
+                printf("addData2Category..FAILED(edge_toDataContent_current)\n");
+                return -1;
+            }
+        }
+        
+        //  first
         if(i==0){
             cltid_lastestCommon = addr.cltid;
             rid_lastestCommon = addr.rid;
@@ -2567,6 +2636,15 @@ Data* queryDataByID(char* dataID){
     int i;
     int count = d->content->versionCount;
     char* rid_dc[count];
+    char* rid_cur;
+    
+    //  current
+    printf("--------------------------------------------------[get @rid current]\n");
+    sprintf(sql,"SELECT in from (select expand(out_toDataContent) from #%s) where name = 'current')",rid_dh);
+    printf("SQL: %s\n",sql);
+    rid_cur = getRid(sql);
+    printf("rid_cur: %s\n",rid_cur);
+
     //char* result_dc[count];
     DataContent *dc[count];
     for(i=0;i<count;i++){
@@ -2617,7 +2695,12 @@ Data* queryDataByID(char* dataID){
         dc[i]->objContent->xmlSchema = temp;
         printf("\nxmlSchema: %s\n",dc[i]->objContent->xmlSchema);
         free(result_schema);
-
+        
+        //  current
+        if(strcmp(rid_cur,rid_dc[i])==0){
+            d->content->current = dc[i];
+        }
+        
         if(i==0){
             dc[i]->preVersion = NULL;
             dc[i]->nextVersion = dc[i+1];
@@ -2686,6 +2769,7 @@ Data* queryDataByID(char* dataID){
         free(rid_dc[i]);
     }
     free(rid_dh);
+    free(rid_cur);
     
     return d;
 }
@@ -2998,6 +3082,272 @@ DeviceRef** getDeviceRefListByID(char* dataID){
     return devRef;
 }
 
+int writeData2PersistentQ(Queue* queue, Data* data, int funcType, char* str){
+    // Create a new node
+    Node* mynode = (Node*)malloc(sizeof(Node));
+    switch(funcType){
+        case _createOrg:
+            mynode->funcType = funcType;
+            mynode->str = strdup(str);
+            mynode->data = NULL;
+            break;
+        case _createUser:
+            mynode->funcType = funcType;
+            mynode->str = strdup(str);
+            mynode->data = NULL;
+            break;
+        case _createCategory:
+            mynode->funcType = funcType;
+            mynode->str = strdup(str);
+            mynode->data = NULL;
+            break;
+        case _createData:
+            mynode->funcType = funcType;
+            mynode->str = strdup(str);
+            mynode->data = NULL;
+            break;
+        case _addData2Category:
+            mynode->funcType = funcType;
+            mynode->data = (Data*)malloc(sizeof(Data));
+            copyData(mynode->data,data);
+            mynode->str = strdup(str);
+            break;
+        case _addCategory2User:
+            mynode->funcType = funcType;
+            mynode->str = strdup(str);
+            mynode->data = NULL;
+            break;
+        case _addUser2Org:
+            mynode->funcType = funcType;
+            mynode->str = strdup(str);
+            mynode->data = NULL;
+            break;
+        default:
+            printf("FAILED >> incorrect funcType\n");
+            free(mynode);
+            return -1;
+            break;
+    }
+    
+    mynode->next = NULL;
+    if (queue->head == NULL) { // no head
+        queue->head = mynode;
+    } else {
+        queue->tail->next = mynode;
+    }
+    queue->tail = mynode;
+    queue->size++;
+}
+
+const char* flushData(Queue* queue){
+    if(queue->size>0){
+        // get the first item
+        Node* head = queue->head;
+        // move head pointer to next node, decrease size
+        queue->head = head->next;
+        queue->size--;
+        
+        char orgID[33], categoryID[33], userID[33];
+        const char* result;
+        switch(head->funcType){
+            case _createOrg:
+                result = createOrg(head->str);
+                free(head->str);
+                free(head);
+                break;
+            case _createUser:
+                result = createUser(head->str);
+                free(head->str);
+                free(head);
+                break;
+            case _createCategory:
+                result = createCategory(head->str);
+                free(head->str);
+                free(head);
+                break;
+            case _createData:
+                result = createData(head->str);
+                free(head->str);
+                free(head);
+                break;
+            case _addData2Category:
+                printf("catID: %s\n",head->str);
+                addData2Category(head->str,head->data);
+                //free Data;
+                free(head->str);
+                free(head);
+                break;
+            case _addCategory2User:
+                printf("\n\nFLUSH...\n");
+                memcpy(userID,head->str,32);
+                userID[32]='\0';
+                memcpy(categoryID,head->str+32,32);
+                categoryID[32]='\0';
+                printf("userID: %s\n",userID);
+                printf("categoryID: %s\n",categoryID);
+                addCategory2User(userID,categoryID);
+                free(head->str);
+                free(head);
+                break;
+            case _addUser2Org:
+                printf("\n\nFLUSH...\n");
+                memcpy(orgID,head->str,32);
+                orgID[32]='\0';
+                memcpy(userID,head->str+32,32);
+                userID[32]='\0';
+                printf("orgID: %s\n",orgID);
+                printf("userID: %s\n",userID);
+                addUser2Org(orgID,userID);
+                free(head->str);
+                free(head);
+                break;
+        }
+        //return 0;
+        return result;
+    }
+    else{
+        printf("no data in queue!!\n\n");
+        //return -1;
+        return NULL;
+    }
+}
+
+int isDataEmpty(Queue* queue){
+    if(queue->size>0){
+        //return queue->size;
+        printf("%d data in Queue\n",queue->size);
+        return -1;
+    }
+    else{
+        printf("no data in Queue\n");
+        return 0;
+    }
+}
+
+Queue* createQueue(){
+    Queue* queue = (Queue*)malloc(sizeof(Queue));
+    queue->size = 0;
+    queue->head = NULL;
+    queue->tail = NULL;
+    return queue;
+}
+
+void freeQueue(Queue* queue){
+    Node *cur, *next;
+    for(cur=queue->head;cur!=NULL;cur=next){
+        next = cur->next;
+        //  ไล่ฟรีของใน queue
+        if(cur->data==NULL){
+            free(cur->str);
+        }
+        else{
+            int j;
+            for(j=0;j<cur->data->content->index_DevRef;j++){
+                free((char*)cur->data->content->userDevicePtr[j]->deviceTransportID);
+                free((char*)cur->data->content->userDevicePtr[j]->userID);
+                free((char*)cur->data->content->userDevicePtr[j]);
+            }
+            
+            DataContent *mydc, *next_mydc;
+            for(mydc=cur->data->content->lastestCommon;mydc!=NULL;mydc=next_mydc){
+                next_mydc = mydc->nextVersion;
+                free(mydc->objContent->xmlSchema);
+                free(mydc->objContent->data);
+                free(mydc->objContent);
+                free(mydc);
+            }
+            
+            free(cur->data->content);
+            free((char*)cur->data->dataID);
+            free((char*)cur->data->chatRoom);
+            free(cur->data);
+            free(cur->str);
+        }
+        //  ฟรี Node
+        free(cur);
+    }
+    free(queue);
+}
+
+void copyData(Data* dest, Data* src){
+    dest->dataID = strdup(src->dataID);
+    memcpy(dest->dataName,src->dataName,strlen(src->dataName));
+    dest->chatRoom = strdup(src->chatRoom);
+    
+    dest->content = (DataHolder*)malloc(sizeof(DataHolder));
+    dest->content->versionKeeped = src->content->versionKeeped;
+    dest->content->versionCount = src->content->versionCount;
+    dest->content->index_DevRef = src->content->index_DevRef;
+    
+    // จอง DataContent+ObjectBinary เท่า VersionCount
+    int i;
+    int count = dest->content->versionCount;
+    DataContent *dc[count];
+    for(i=0;i<count;i++){
+        dc[i] = (DataContent*)malloc(sizeof(DataContent));
+        dc[i]->objContent = (ObjectBinary*)malloc(sizeof(ObjectBinary));
+    }
+    
+    char addr_curr[20],addr_point[20];
+    printf("@current: %p\n",src->content->current);
+    sprintf(addr_curr,"%p",src->content->current);
+    
+    DataContent *mydc, *next_mydc;
+    i=0;
+    for(mydc=src->content->lastestCommon;mydc!=NULL;mydc=next_mydc){
+        // current
+        printf("@mydc #%d: %p\n",i,mydc);
+        sprintf(addr_point,"%p",mydc);
+        
+        if(strcmp(addr_curr,addr_point)==0){
+            dest->content->current = dc[i];
+        }
+        
+        if(i==0){
+            dc[i]->preVersion = NULL;
+            dc[i]->nextVersion = dc[i+1];
+        }
+        else if(i+1==count){
+            dc[i]->preVersion = dc[i-1];
+            dc[i]->nextVersion = NULL;
+        }
+        else {
+            dc[i]->preVersion = dc[i-1];
+            dc[i]->nextVersion = dc[i+1];
+        }
+
+        dc[i]->isDiff = mydc->isDiff;
+        dc[i]->objContent->byteCount = mydc->objContent->byteCount;
+        dc[i]->objContent->xmlSchema = strdup(mydc->objContent->xmlSchema);
+        dc[i]->objContent->data = strdup(mydc->objContent->data);
+        next_mydc = mydc->nextVersion;
+        i++;
+    }
+    
+    // lastestCommon, head
+    dest->content->lastestCommon = dc[0];
+    dest->content->head = dc[count-1];
+
+    //  จอง DeviceRef เท่า index_DevRef
+    int index = src->content->index_DevRef;
+    for(i=0;i<index;i++){
+        dest->content->userDevicePtr[i] = (DeviceRef*)malloc(sizeof(DeviceRef));
+        dest->content->userDevicePtr[i]->userID = strdup(src->content->userDevicePtr[i]->userID);
+        dest->content->userDevicePtr[i]->deviceTransportID = strdup(src->content->userDevicePtr[i]->deviceTransportID);
+        memcpy(dest->content->userDevicePtr[i]->nodeRefToDataContent,src->content->userDevicePtr[i]->nodeRefToDataContent,strlen(src->content->userDevicePtr[i]->nodeRefToDataContent));
+    }
+    
+//    printf("==== T E S T ====\n");
+//    for(mydc=dest->content->lastestCommon;mydc!=NULL;mydc=next_mydc){
+//        next_mydc = mydc->nextVersion;
+//        printf("isDiff: %d\n",mydc->isDiff);
+//        printf("byteCount: %d\n",mydc->objContent->byteCount);
+//        printf("xml: %s\n",mydc->objContent->xmlSchema);
+//        printf("data: %s\n",mydc->objContent->data);
+//    }
+    
+}
+
 //----------------------------------------------------------------------------------------------------------
 
 //int testUUID(uuid_t* uuid) {
@@ -3226,7 +3576,14 @@ void testsetNewDataContent(char* categoryID){
     result[8] = getDataContentVer(mydata,8);
     printf("result[8]: %s\n\n",result[8]);
     
+    
     addData2Category(categoryID,mydata);
+//    Queue* queue = createQueue();
+//    writeData2PersistentQ(queue, mydata, _addData2Category, categoryID);
+//    isDataEmpty(queue);
+//    flushData(queue);
+//    isDataEmpty(queue);
+    
     
     const char* uuid_usr2;
     const char* uuid_cat2;
@@ -3582,7 +3939,12 @@ void testDraft2_ByID(){
 
 void testqueryDataByID(){
     Data* mydata;
-    mydata = queryDataByID("A19E592D09344701B6B4504CB1D55DCB");
+    mydata = queryDataByID("9703242D76F7426E9807390044AC366D");
+//    Data* _mydata;
+//    _mydata = queryDataByID("3DA75AF92ABB42D78E86AB767BD69BE4");
+//    
+//    Data* mydata = (Data*)malloc(sizeof(Data));
+//    copyData(mydata,_mydata);
     
     /* Print for check all data */
     printf("\n-..-..-..-..-..-..-..-..-..-..-..-..-..-..-..-..-..-..-..-..-..-..-..-..-\n");
@@ -3607,6 +3969,8 @@ void testqueryDataByID(){
         printf("data: %s\n",mydc->objContent->data);
     }
     
+    printf("\n\ndata_cur: %s\n",mydata->content->current->objContent->data);
+    
     //  DeviceRef
     int j;
     for(j=0;j<mydata->content->index_DevRef;j++){
@@ -3617,7 +3981,40 @@ void testqueryDataByID(){
     
     printf("\n-..-..-..-..-..-..-..-..-..-..-..-..-..-..-..-..-..-..-..-..-..-..-..-..-\n");
     
-    //  free all data
+//    const char* org;
+//    const char* cat;
+//    const char* user;
+
+    Queue* queue = createQueue();
+    isDataEmpty(queue);
+    writeData2PersistentQ(queue, mydata, _addData2Category, "00267708E37A4A60A77639DCF5A90528");
+    isDataEmpty(queue);
+    //flushData(queue);
+    //isDataEmpty(queue);
+    freeQueue(queue);
+
+//    writeData2PersistentQ(queue, NULL, _createOrg, "Reuters");
+//    writeData2PersistentQ(queue, NULL, _createUser, "Arisa");
+//    writeData2PersistentQ(queue, NULL, _createCategory, "Files");
+//    org = flushData(queue);
+//    user = flushData(queue);
+//    cat =  flushData(queue);
+//    
+//    char user_cat[100];
+//    sprintf(user_cat,"%s%s",user,cat);
+//    printf("user_cat: %s\n",user_cat);
+//    char org_user[100];
+//    sprintf(org_user,"%s%s",org,user);
+//    printf("org_user: %s\n",org_user);
+//    writeData2PersistentQ(queue, NULL, _addUser2Org, org_user);
+//    writeData2PersistentQ(queue, NULL, _addCategory2User, user_cat);
+//    flushData(queue);
+//    flushData(queue);
+//
+//    isDataEmpty(queue);
+    
+    
+    //  free all mydata
     for(j=0;j<mydata->content->index_DevRef;j++){
         free((char*)mydata->content->userDevicePtr[j]->deviceTransportID);
         free((char*)mydata->content->userDevicePtr[j]->userID);
@@ -3636,5 +4033,39 @@ void testqueryDataByID(){
     free((char*)mydata->dataID);
     free((char*)mydata->chatRoom);
     free(mydata);
+    
+//    //  free all _mydata
+//    for(j=0;j<_mydata->content->index_DevRef;j++){
+//        free((char*)_mydata->content->userDevicePtr[j]->deviceTransportID);
+//        free((char*)_mydata->content->userDevicePtr[j]->userID);
+//        free((char*)_mydata->content->userDevicePtr[j]);
+//    }
+//    
+//    for(mydc=_mydata->content->lastestCommon;mydc!=NULL;mydc=next_mydc){
+//        next_mydc = mydc->nextVersion;
+//        free(mydc->objContent->xmlSchema);
+//        free(mydc->objContent->data);
+//        free(mydc->objContent);
+//        free(mydc);
+//    }
+//    
+//    free(_mydata->content);
+//    free((char*)_mydata->dataID);
+//    free((char*)_mydata->chatRoom);
+//    free(_mydata);
 }
 
+void testElement(){
+    Element* myElement = (Element*)malloc(sizeof(Element));
+    
+    myElement->type = et_int;
+    myElement->myNum = 10;
+    printf("myNum: %d\n", myElement->myNum);
+    
+    myElement->type = et_Text;
+    myElement->myText = strdup("test text");
+    printf("myText: %s\n", myElement->myText);
+    
+    free(myElement->myText);
+    free(myElement);
+}
