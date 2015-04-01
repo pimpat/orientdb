@@ -237,7 +237,6 @@ enum FUNCTYPE{
     _createCategory,
     _createData,
     _addData2Category,
-    //_addData2CategoryTest,
     _addCategory2User,
     _addUser2Org,
     
@@ -261,13 +260,30 @@ typedef struct Queue {
     int size;
 } Queue;
 
+typedef struct NodeOut NodeOut;
+struct NodeOut{
+    NodeOut* next;
+    Element* ele;
+};
+
+typedef struct QDataOut {
+    NodeOut* head;
+    NodeOut* tail;
+    int size;
+};
+
 int writeData2PersistentQ(Queue* queue, Data* data, int funcType, char* str);
-//const char* flushData(Queue* queue);
-Element* flushData(Queue* queue);
+//Element* flushData(Queue* queue);
+int flushData(Queue* queue);
 int isDataEmpty(Queue* queue);
 Queue* createQueue();
 void freeQueue(Queue* queue);
 void copyData(Data* dest, Data* src);
+
+int addDataOut(Element* element);
+Element** getDataOut();
+int isDataOutEmpty();
+QDataOut queue_out;
 
 /* Test Pim */
 //int testUUID(uuid_t* uuid);
@@ -846,7 +862,7 @@ char* getRid(char *query) {
         return NULL;
     }
     
-    char myResult[15];
+    char myResult[20];
     char* str;
     char* token;
     char delim[2] = "#";
@@ -932,6 +948,9 @@ char** getArrayRid(char* query){
     swapEndian(&total, INT);
     printf("total: %d\n",total);    // total record
     read(Sockfd, &GPacket.msg, 2+1+2+8+4);
+    
+    if(total==0)
+        return NULL;
     
     char **result_rid = (char**)malloc(sizeof(char*)*total+1);
     
@@ -3226,13 +3245,20 @@ int writeData2PersistentQ(Queue* queue, Data* data, int funcType, char* str){
     }
     queue->tail = mynode;
     queue->size++;
+    return 0;
 }
 
-Element* flushData(Queue* queue){
-//const char* flushData(Queue* queue){
+//Element* flushData(Queue* queue){
+int flushData(Queue* queue){
     if(queue->size>0){
         openDatabase(DB_NAME);
-        Element* element = (Element*)malloc(sizeof(Element));
+        Element** elePtr = (Element**)malloc(sizeof(Element*)*queue->size);
+        int i;
+        for(i=0;i<queue->size;i++)
+            elePtr[i] = (Element*)malloc(sizeof(Element));
+        i=0;
+        while(queue->size>0){
+        
         // get the first item
         Node* head = queue->head;
         // move head pointer to next node, decrease size
@@ -3244,55 +3270,55 @@ Element* flushData(Queue* queue){
         //const char* result;
         switch(head->funcType){
             case _getDataContentCommonVersionByID:
-                element->type = et_ObjectBinary;
-                element->myObjBin = getDataContentCommonVersionByID(head->str);
+                elePtr[i]->type = et_ObjectBinary;
+                elePtr[i]->myObjBin = getDataContentCommonVersionByID(head->str);
                 free(head->str);
                 free(head);
                 break;
             case _getDataContentByID:
-                element->type = et_ObjectBinary;
-                element->myObjBin = getDataContentByID(head->str);
+                elePtr[i]->type = et_ObjectBinary;
+                elePtr[i]->myObjBin = getDataContentByID(head->str);
                 free(head->str);
                 free(head);
                 break;
             case _getDiffDataAtlastestCommonByID:
-                element->type = et_Text;
-                element->myText = getDiffDataAtlastestCommonByID(head->str);
+                elePtr[i]->type = et_Text;
+                elePtr[i]->myText = getDiffDataAtlastestCommonByID(head->str);
                 free(head->str);
                 free(head);
                 break;
             case _getDiffDataAtheadByID:
-                element->type = et_Text;
-                element->myText = getDiffDataAtheadByID(head->str);
+                elePtr[i]->type = et_Text;
+                elePtr[i]->myText = getDiffDataAtheadByID(head->str);
                 free(head->str);
                 free(head);
                 break;
             case _getContentNextVerByID:
-                element->type = et_ObjectBinary;
-                element->myObjBin = getContentNextVerByID(head->str);
+                elePtr[i]->type = et_ObjectBinary;
+                elePtr[i]->myObjBin = getContentNextVerByID(head->str);
                 free(head->str);
                 free(head);
                 break;
             case _getContentPreVerByID:
-                element->type = et_ObjectBinary;
-                element->myObjBin = getContentPreVerByID(head->str);
+                elePtr[i]->type = et_ObjectBinary;
+                elePtr[i]->myObjBin = getContentPreVerByID(head->str);
                 free(head->str);
                 free(head);
                 break;
             case _getDiffDataNextVerByID:
-                element->type = et_Text;
-                element->myText = getDiffDataNextVerByID(head->str);
+                elePtr[i]->type = et_Text;
+                elePtr[i]->myText = getDiffDataNextVerByID(head->str);
                 free(head->str);
                 free(head);
                 break;
             case _getDiffDataPreVerByID:
-                element->type = et_Text;
-                element->myText = getDiffDataPreVerByID(head->str);
+                elePtr[i]->type = et_Text;
+                elePtr[i]->myText = getDiffDataPreVerByID(head->str);
                 free(head->str);
                 free(head);
                 break;
             case _getDataContentWithTagByID:
-                element->type = et_Text;
+                elePtr[i]->type = et_Text;
                 printf("\n\nFLUSH...\n");
                 memcpy(dataID,head->str,32);
                 dataID[32]='\0';
@@ -3301,12 +3327,12 @@ Element* flushData(Queue* queue){
                 printf("dataID: %s\n",dataID);
                 printf("tagName: %s\n",tagName);
                 
-                element->myText = getDataContentWithTagByID(dataID,tagName);
+                elePtr[i]->myText = getDataContentWithTagByID(dataID,tagName);
                 free(head->str);
                 free(head);
                 break;
             case _getDataContent:
-                element->type = et_Text;
+                elePtr[i]->type = et_Text;
                 printf("\n\nFLUSH...\n");
                 
                 token = strtok(head->str,":");
@@ -3324,44 +3350,44 @@ Element* flushData(Queue* queue){
                 memcpy(tagName,token,strlen(token));
                 tagName[strlen(tagName)]='\0';
                 
-                element->myText = getDataContent(xml_schema,dataID,tagName);
+                elePtr[i]->myText = getDataContent(xml_schema,dataID,tagName);
                 free(head->str);
                 free(head);
                 break;
             case _createOrg:
-                element->type = et_const_char;
-                element->myID = createOrg(head->str);
+                elePtr[i]->type = et_const_char;
+                elePtr[i]->myID = createOrg(head->str);
                 free(head->str);
                 free(head);
                 break;
             case _createUser:
-                element->type = et_const_char;
-                element->myID = createUser(head->str);
+                elePtr[i]->type = et_const_char;
+                elePtr[i]->myID = createUser(head->str);
                 free(head->str);
                 free(head);
                 break;
             case _createCategory:
-                element->type = et_const_char;
-                element->myID = createCategory(head->str);
+                elePtr[i]->type = et_const_char;
+                elePtr[i]->myID = createCategory(head->str);
                 free(head->str);
                 free(head);
                 break;
             case _createData:
-                element->type = et_const_char;
-                element->myID = createData(head->str);
+                elePtr[i]->type = et_const_char;
+                elePtr[i]->myID = createData(head->str);
                 free(head->str);
                 free(head);
                 break;
             case _addData2Category:
-                element->type = et_int;
+                elePtr[i]->type = et_int;
                 printf("catID: %s\n",head->str);
-                element->myNum = addData2Category(head->str,head->data);
+                elePtr[i]->myNum = addData2Category(head->str,head->data);
                 //free Data;
                 free(head->str);
                 free(head);
                 break;
             case _addCategory2User:
-                element->type = et_int;
+                elePtr[i]->type = et_int;
                 printf("\n\nFLUSH...\n");
                 memcpy(userID,head->str,32);
                 userID[32]='\0';
@@ -3369,12 +3395,12 @@ Element* flushData(Queue* queue){
                 categoryID[32]='\0';
                 printf("userID: %s\n",userID);
                 printf("categoryID: %s\n",categoryID);
-                element->myNum = addCategory2User(userID,categoryID);
+                elePtr[i]->myNum = addCategory2User(userID,categoryID);
                 free(head->str);
                 free(head);
                 break;
             case _addUser2Org:
-                element->type = et_int;
+                elePtr[i]->type = et_int;
                 printf("\n\nFLUSH...\n");
                 memcpy(orgID,head->str,32);
                 orgID[32]='\0';
@@ -3382,52 +3408,58 @@ Element* flushData(Queue* queue){
                 userID[32]='\0';
                 printf("orgID: %s\n",orgID);
                 printf("userID: %s\n",userID);
-                element->myNum = addUser2Org(orgID,userID);
+                elePtr[i]->myNum = addUser2Org(orgID,userID);
                 free(head->str);
                 free(head);
                 break;
             case _queryDataByID:
-                element->type = et_Data;
-                element->myData = queryDataByID(head->str);
+                elePtr[i]->type = et_Data;
+                elePtr[i]->myData = queryDataByID(head->str);
                 free(head->str);
                 free(head);
                 break;
             case _queryCategoryByID:
-                element->type = et_Category;
-                element->myCatPtr = queryCategoryByID(head->str);
+                elePtr[i]->type = et_Category;
+                elePtr[i]->myCatPtr = queryCategoryByID(head->str);
                 free(head->str);
                 free(head);
                 break;
             case _queryUserByID:
-                element->type = et_User;
-                element->myUserPtr = queryUserByID(head->str);
+                elePtr[i]->type = et_User;
+                elePtr[i]->myUserPtr = queryUserByID(head->str);
                 free(head->str);
                 free(head);
                 break;
             case _getDeviceRefListByID:
-                element->type = et_DeviceRef;
-                element->myDeviceArr = getDeviceRefListByID(head->str);
+                elePtr[i]->type = et_DeviceRef;
+                elePtr[i]->myDeviceArr = getDeviceRefListByID(head->str);
                 free(head->str);
                 free(head);
                 break;
         }
+        // แก้ เอา element ไปใส่ queue_out
+        addDataOut(elePtr[i]);
+        i++;
+    }
         disconnectServer();
-        return element;
+        free(elePtr);
+        return 0;
     }
-    else{
-        printf("no data in queue!!\n\n");
-        return NULL;
-    }
+//    else{
+//        printf("no data in queue!!\n\n");
+//        //return NULL;
+//        return -1;
+//    }
 }
 
 int isDataEmpty(Queue* queue){
     if(queue->size>0){
         //return queue->size;
-        printf("%d data in Queue\n",queue->size);
+        printf("*** %d data in Queue\n",queue->size);
         return -1;
     }
     else{
-        printf("no data in Queue\n");
+        printf("*** no data in Queue\n");
         return 0;
     }
 }
@@ -3554,6 +3586,65 @@ void copyData(Data* dest, Data* src){
 //        printf("data: %s\n",mydc->objContent->data);
 //    }
     
+}
+
+int addDataOut(Element* element){
+    NodeOut* mynode =(NodeOut*)malloc(sizeof(NodeOut));
+    mynode->ele = element;
+    mynode->next = NULL;
+    
+    if (queue_out.head == NULL) { // no head
+        queue_out.head = mynode;
+    } else {
+        queue_out.tail->next = mynode;
+    }
+    queue_out.tail = mynode;
+    queue_out.size++;
+//    
+//    printf("!\n!\nt e s t");
+//    printf("\nuserID: %s\n",mynode->ele->myDeviceArr[0]->userID);
+//    printf("deviceTransportID: %s\n",mynode->ele->myDeviceArr[0]->deviceTransportID);
+//    printf("nodeRef: %s\n",mynode->ele->myDeviceArr[0]->nodeRefToDataContent);
+    
+    return 0;
+}
+
+Element** getDataOut(){
+    //printf("in getDataOut\n");
+    if(queue_out.size>0){
+        printf("\n\n\nQUEUESIZE: %d\n", queue_out.size);
+        Element** elePtr = (Element**)malloc(sizeof(Element*)*queue_out.size+1);
+        elePtr[queue_out.size] = NULL;
+        int i = 0;
+        NodeOut* myhead;
+        while(queue_out.size>0){
+            printf("QUEUESIZE: %d\n", queue_out.size);
+            //elePtr[i] = (Element*)malloc(sizeof(Element));
+            myhead = queue_out.head;
+            elePtr[i] = myhead->ele;
+            queue_out.head = myhead->next;
+            free(myhead);
+            queue_out.size--;
+            printf("round %d\n",i);
+            i++;
+        }
+        return elePtr;
+    }
+    else{
+        printf("no data in queue(DataOut)!!\n\n");
+        return NULL;
+    }
+}
+
+int isDataOutEmpty(){
+    if(queue_out.size>0){
+        printf("*** %d data in Queue\n",queue_out.size);
+        return -1;
+    }
+    else{
+        printf("*** no data in Queue\n");
+        return 0;
+    }
 }
 
 //----------------------------------------------------------------------------------------------------------
@@ -4199,20 +4290,39 @@ void testqueryDataByID(){
 //    //isDataEmpty(queue);
 //    freeQueue(queue);
 
-    Element *ele;
+    
     Queue* queue = createQueue();
-    isDataEmpty(queue);
+    //Queue* queue_out = createQueue();
+    //freeQueue(queue_out);
+//    Queue* q_output = &queue_out;
+//    isDataEmpty(q_output);
+    
     //writeData2PersistentQ(queue,NULL,_getContentNextVerByID,"9703242D76F7426E9807390044AC366D");
-    //writeData2PersistentQ(queue,NULL,_getDataContent,"SCHEMA:9703242D76F7426E9807390044AC366D:title:");
+    
+    int ret;
     writeData2PersistentQ(queue,NULL,_getDeviceRefListByID,"9703242D76F7426E9807390044AC366D");
-    ele = flushData(queue);
+    writeData2PersistentQ(queue,NULL,_getDataContent,"SCHEMA:9703242D76F7426E9807390044AC366D:title:");
+    writeData2PersistentQ(queue,NULL,_getDataContentCommonVersionByID,"9703242D76F7426E9807390044AC366D");
+    writeData2PersistentQ(queue,NULL,_getDataContentByID,"9703242D76F7426E9807390044AC366D");
+    isDataEmpty(queue);
+    ret = flushData(queue);
+    printf("ret: %d\n",ret);
     isDataEmpty(queue);
     
-    printf("\n[test]\n");
+    Element** elePtr;
+    Element *ele, *ele2, *ele3, *ele4;
+    isDataOutEmpty();
+    elePtr = getDataOut();
+    ele = elePtr[0];
+    ele2 = elePtr[1];
+    ele3 = elePtr[2];
+    ele4 = elePtr[3];
+    
+    int i;
+    printf("\n[test..1]\n");
     if(ele->myDeviceArr!=NULL){
-        int i;
         for(i=0;ele->myDeviceArr[i]!=NULL;i++){
-            printf("\nuserID: %s\n",ele->myDeviceArr[i]->userID);
+            printf("userID: %s\n",ele->myDeviceArr[i]->userID);
             printf("deviceTransportID: %s\n",ele->myDeviceArr[i]->deviceTransportID);
             printf("nodeRef: %s\n",ele->myDeviceArr[i]->nodeRefToDataContent);
         
@@ -4222,6 +4332,31 @@ void testqueryDataByID(){
         }
         free(ele->myDeviceArr);
     }
+
+    printf("\n[test..2]\n");
+    printf("myText: %s\n", ele2->myText);
+    free(ele2->myText);
+    
+    printf("\n[test..3]\n");
+    printf("byteCount: %d\n",ele3->myObjBin->byteCount);
+    printf("xml: %s\n",ele3->myObjBin->xmlSchema);
+    printf("data: %s\n",ele3->myObjBin->data);
+    free(ele3->myObjBin->xmlSchema);
+    free(ele3->myObjBin->data);
+    free(ele3->myObjBin);
+    
+    printf("\n[test..4]\n");
+    printf("byteCount: %d\n",ele4->myObjBin->byteCount);
+    printf("xml: %s\n",ele4->myObjBin->xmlSchema);
+    printf("data: %s\n",ele4->myObjBin->data);
+    free(ele4->myObjBin->xmlSchema);
+    free(ele4->myObjBin->data);
+    free(ele4->myObjBin);
+    
+    for(i=0;elePtr[i]!=NULL;i++){
+        free(elePtr[i]);
+    }
+    free(elePtr);
     
 //    int i;
 //    for(i=0;ele->myCatPtr[i]!=NULL;i++){
@@ -4271,14 +4406,12 @@ void testqueryDataByID(){
     //printf("Diff: %s\n",ele->myText);
     
     freeQueue(queue);
-    
+
     //free(ele->myObjBin->xmlSchema);
     //free(ele->myObjBin->data);
     //free(ele->myObjBin);
-    
     //free(ele->myText);
-    
-    free(ele);
+    //free(ele);
     
 /*
     Element *ele_org, *ele_user, *ele_cat, *ele_adduo, *ele_addcu;
