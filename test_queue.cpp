@@ -21,7 +21,7 @@
 
 #define SERVER_IP "0.0.0.0"
 #define SERVER_PORT 2424
-#define NAME_SIZE (19999)
+#define NAME_SIZE (19999)           // NAME_SIZE*2 = GPacket.msg
 
 #define DB_NAME "test-draft2"
 #define MAX_SCHEMA (1000)
@@ -29,7 +29,7 @@
 #define MAX_DIFF_SIZE (1000)
 #define MAX_NODE_REF_SIZE (1000)
 #define MAX_CONTENT_SIZE (1000)
-#define MAX_NEW_TAG (20)
+#define MAX_NEW_TAG (20)            // not used
 #define FULL_CONTENT (4)
 #define VER_KEEPED (3)
 
@@ -49,10 +49,10 @@ typedef struct Addr{
 } Addr;
 Addr addr;
 
-typedef struct Rid{
-    Rid* next;
-    char rid[20];
-} Rid;
+//typedef struct Rid{
+//    Rid* next;
+//    char rid[20];
+//} Rid;
 
 typedef char* Text;
 typedef struct ObjectBinary {
@@ -157,8 +157,8 @@ Text getDiffDataPreVer(Data* data);
 Text getDiffDataNextVerByID(char* dataID);
 Text getDiffDataPreVerByID(char* dataID);
 
-int getCurLevelFromCommon(Data* data);
-int getCurLevelFromHead(Data* data);
+int getCurLevelFromCommon(Data* data);  //  not
+int getCurLevelFromHead(Data* data);    //  not
 
 Text getDataContentWithTag(Data* data, char* tagName);
 Text getDataContentWithTagByID(char* dataID, char* tagName);
@@ -270,7 +270,7 @@ typedef struct QDataOut {
     NodeOut* head;
     NodeOut* tail;
     int size;
-};
+} QDataOut;
 
 int writeData2PersistentQ(Queue* queue, Data* data, int funcType, char* str);
 //Element* flushData(Queue* queue);
@@ -300,6 +300,9 @@ void testDraft2_ByID();
 void testqueryDataByID();
 void testElement();
 
+int createRecord(int cltId, char* recContent);
+int testTX_Commit();
+
 int main() {
     int ret;
     int size;
@@ -309,11 +312,16 @@ int main() {
     Sockfd = connectSocket();
     if (Sockfd < 0) return Sockfd;
 
-//    ret = openDatabase(DB_NAME);
-//    if (ret!=0) {
-//        printf ("error openDatabase\n");
-//        return 1;
-//    }
+    ret = openDatabase(DB_NAME);
+    if (ret!=0) {
+        printf ("error openDatabase\n");
+        return 1;
+    }
+
+//    testTX_Commit();
+//    createRecord(11,"orgID:552F0294F0B6464A9579EF72F007BF15,orgName:TEST4");
+//    loadRecord(11,61);
+//    queryRecord("select from Org");
 
     //testUUID(uuid);
     //testDMP();
@@ -330,8 +338,11 @@ int main() {
 
 //  Test Draft II --------------------------------------------------------------
     //testqueryCategoryByID("A19E592D09344701B6B4504CB1D55DCB");
-//    testqueryUserByID("A19E592D09344701B6B4504CB1D55DCB");
-    testqueryDataByID();
+    testqueryUserByID("9703242D76F7426E9807390044AC366D");
+    //queryRecord("select shortestPath(#20:2615,#20:2622,'BOTH')");
+    //queryRecord("find references #22:531");
+//    testqueryDataByID();
+    
 //    testDraft2_ByID();
 //    testDraft2();
 //    testElement();
@@ -373,7 +384,7 @@ int main() {
     //sendCommand("delete vertex #11:67");
     //sendCommand("update Diff set key='555', value='666' where key='100'");
     
-//    disconnectServer();
+    disconnectServer();
     close(Sockfd);
 
     return 0;
@@ -462,6 +473,54 @@ int createClass(char *myclass, char *extend) {
     if (ret!=0) return 1;
     
     printf("%s: OK!\n", command);
+    return 0;
+}
+
+int createRecord(int cltId, char* recContent){
+    int ret, size;
+    GPacket.opType = REQUEST_RECORD_CREATE;
+    size = reqRecCreateMsg(GPacket.msg, cltId, recContent);
+    ret = write(Sockfd, &GPacket, 5+size);
+    
+    ret = read(Sockfd, &GPacket, 5+0);
+    if (ret<0 || GPacket.opType!=0) return 1;
+    
+    short clusterId;
+    read(Sockfd, &clusterId, sizeof(short));
+    swapEndian(&clusterId, SHORT);
+    printf("clusterId: %d\n", clusterId);
+    
+    long clusterPos;
+    read(Sockfd, &clusterPos, sizeof(long));
+    swapEndian(&clusterPos, LONG);
+    printf("clusterPos: %d\n", clusterPos);
+    
+    int recVersion;
+    read(Sockfd, &recVersion, sizeof(int));
+    swapEndian(&recVersion, INT);
+    printf("record-version: %d\n", recVersion);
+    
+    int count_of_changes;
+    read(Sockfd, &count_of_changes, sizeof(int));
+    swapEndian(&count_of_changes, INT);
+    printf("count_of_changes: %d\n", count_of_changes);
+    
+    return 0;
+}
+
+int testTX_Commit(){
+    int ret, size;
+    GPacket.opType = REQUEST_TX_COMMIT;
+    
+    size = reqTX_Commit(GPacket.msg, 50, "orgID:002F0294F0B6464A9579EF72F007BF15,orgName:TEST3");
+    ret = write(Sockfd, &GPacket, 5+size);
+    
+    ret = read(Sockfd, &GPacket, 5+0);
+    if (ret<0 || GPacket.opType!=0) {
+        printf("error\n");
+        return 1;
+    }
+    
     return 0;
 }
 
@@ -1062,7 +1121,6 @@ ObjectBinary* getDataContent(Data* data){
 }
 
 ObjectBinary* getDataContentCommonVersionByID(char* dataID){
-    ObjectBinary* obj_ct = (ObjectBinary*)malloc(sizeof(ObjectBinary));
     char sql[MAX_SQL_SIZE];
     char *rid_dh, *rid_dc;
     char *result1, *result2;
@@ -1072,17 +1130,31 @@ ObjectBinary* getDataContentCommonVersionByID(char* dataID){
     sprintf(sql,"SELECT @rid from (select expand(out('toDataHolder')) from Data where dataID ='%s')",dataID);
     printf("SQL: %s\n",sql);
     rid_dh = getRid(sql);
+    if(rid_dh==NULL){
+        return NULL;
+    }
     
     printf("--------------------------------------------------[get @rid lastestCommon]\n");
     sprintf(sql,"SELECT in from (select expand(out_toDataContent) from #%s) where name = 'lastestCommon')",rid_dh);
     printf("SQL: %s\n",sql);
     rid_dc = getRid(sql);
+    if(rid_dc==NULL){
+        free(rid_dh);
+        return NULL;
+    }
 
+    ObjectBinary* obj_ct = (ObjectBinary*)malloc(sizeof(ObjectBinary));
+    
     printf("--------------------------------------------------[get objContent]\n");
     sprintf(sql,"SELECT byteCount,data from #%s",rid_dc);
     printf("SQL: %s\n",sql);
     result1 = getContent(sql);
-    
+    if(result1==NULL){
+        free(rid_dh);
+        free(rid_dc);
+        free(obj_ct);
+        return NULL;
+    }
     
     token = strtok(result1,":");
     token = strtok(NULL,",");
@@ -1105,13 +1177,22 @@ ObjectBinary* getDataContentCommonVersionByID(char* dataID){
     sprintf(sql,"SELECT xmlSchema from #%s",rid_dc);
     printf("SQL: %s\n",sql);
     result2 = getContent(sql);
-    printf("result2: %s\n",result2);
-    char* temp = (char*)malloc(sizeof(char)*MAX_SCHEMA);
-    memcpy(temp,result2+11,strlen(result2)-11);
-    temp[strlen(temp)-1] = '\0';
-    printf("\ntemp: %s\n",temp);
-    obj_ct->xmlSchema = temp;
-    //printf("xmlSchema: %s\n", obj_ct->xmlSchema);
+    if(result2==NULL){
+        free(rid_dh);
+        free(rid_dc);
+        free(result1);
+        free(obj_ct->data);
+        free(obj_ct);
+        return NULL;
+    }
+    
+    //printf("result2: %s\n",result2);
+    char* result_schema = (char*)malloc(sizeof(char)*MAX_SCHEMA);
+    memcpy(result_schema,result2+11,strlen(result2)-11);
+    result_schema[strlen(result_schema)-1] = '\0';
+    //printf("\nresult_schema: %s\n",result_schema);
+    obj_ct->xmlSchema = result_schema;
+    printf("xmlSchema: %s\n", obj_ct->xmlSchema);
 
     free(result1);
     free(result2);
@@ -1121,7 +1202,6 @@ ObjectBinary* getDataContentCommonVersionByID(char* dataID){
 }
 
 ObjectBinary* getDataContentByID(char* dataID){
-    ObjectBinary* obj_ct = (ObjectBinary*)malloc(sizeof(ObjectBinary));
     char sql[MAX_SQL_SIZE];
     char *rid_dh;
     char* token;
@@ -1132,6 +1212,9 @@ ObjectBinary* getDataContentByID(char* dataID){
     sprintf(sql,"SELECT @rid from (select expand(out('toDataHolder')) from Data where dataID ='%s')",dataID);
     printf("SQL: %s\n",sql);
     rid_dh = getRid(sql);
+    if(rid_dh==NULL){
+        return NULL;
+    }
     
     /*
     printf("--------------------------------------------------[get versionCount]\n");
@@ -1155,12 +1238,29 @@ ObjectBinary* getDataContentByID(char* dataID){
     sprintf(sql,"SELECT in from (select expand(out_toDataContent) from #%s) where name = 'head'",rid_dh);
     printf("SQL: %s\n",sql);
     rid_dc[0] = getRid(sql);
+    if(rid_dc[0]==NULL){
+        free(rid_dh);
+        return NULL;
+    }
     printf("rid_head: %s\n",rid_dc[0]);
+    
+    ObjectBinary* obj_ct = (ObjectBinary*)malloc(sizeof(ObjectBinary));
     
     for(i=0;i<FULL_CONTENT;i++){
         printf("--------------------------------------------------[get data]\n");
         sprintf(sql,"SELECT isDiff,data from #%s",rid_dc[i]);
         result_data = getContent(sql);
+        if(result_data==NULL){
+            free(rid_dh);
+            int k;
+            for(k=0;k<=i;k++){
+                free(rid_dc[k]);
+                if(k!=0)
+                    free(result_dc[k-1]);
+            }
+            free(obj_ct);
+            return NULL;
+        }
         
         token = strtok(result_data, ":");
         token = strtok(NULL, ",");
@@ -1176,11 +1276,20 @@ ObjectBinary* getDataContentByID(char* dataID){
 
         // เป็น full ตั้งแต่ head
         if(full_con==1 && i==0){
-            // retturn เลย
+            // return เลย
             printf("--------------------------------------------------[get objContent_Schema]\n");
             sprintf(sql,"SELECT xmlSchema from #%s",rid_dc[i]);
             printf("SQL: %s\n",sql);
             result_schema = getContent(sql);
+            if(result_schema==NULL){
+                free(rid_dh);
+                free(rid_dc[0]);
+                free(result_data);
+                free(result_dc[0]);
+                free(obj_ct);
+                return NULL;
+            }
+
             printf("result_schema: %s\n",result_schema);
             char* temp = (char*)malloc(sizeof(char)*MAX_SCHEMA);
             memcpy(temp,result_schema+11,strlen(result_schema)-11);
@@ -1203,6 +1312,18 @@ ObjectBinary* getDataContentByID(char* dataID){
             sprintf(sql,"SELECT xmlSchema from #%s",rid_dc[i]);
             printf("SQL: %s\n",sql);
             result_schema = getContent(sql);
+            if(result_schema==NULL){
+                free(rid_dh);
+                free(result_data);
+                int k;
+                for(k=0;k<=i;k++){
+                    free(rid_dc[k]);
+                    free(result_dc[k]);
+                }
+                free(obj_ct);
+                return NULL;
+            }
+            
             printf("result_schema: %s\n",result_schema);
             char* temp = (char*)malloc(sizeof(char)*MAX_SCHEMA);
             memcpy(temp,result_schema+11,strlen(result_schema)-11);
@@ -1218,6 +1339,18 @@ ObjectBinary* getDataContentByID(char* dataID){
             sprintf(sql,"select in from (select expand(out_toDiffContent) from #%s) where status='pre'",rid_dc[i]);
             printf("SQL: %s\n",sql);
             rid_dc[i+1] = getRid(sql);
+            if(rid_dc[i+1]==NULL){
+                free(rid_dh);
+                free(result_data);
+                int k;
+                for(k=0;k<=i;k++){
+                    free(rid_dc[k]);
+                    free(result_dc[k]);
+                }
+                free(obj_ct);
+                return NULL;
+            }
+            
             printf("rid[%d]: %s\n",i+1,rid_dc[i+1]);
             free(result_data);
         }
@@ -1264,16 +1397,28 @@ Text getDiffDataAtlastestCommonByID(char* dataID){
     sprintf(sql,"SELECT @rid from (select expand(out('toDataHolder')) from Data where dataID ='%s')",dataID);
     printf("SQL: %s\n",sql);
     rid_dh = getRid(sql);
+    if(rid_dh==NULL){
+        return NULL;
+    }
     
     printf("--------------------------------------------------[get @rid lastestCommon]\n");
     sprintf(sql,"SELECT in from (select expand(out_toDataContent) from #%s) where name = 'lastestCommon')",rid_dh);
     printf("SQL: %s\n",sql);
     rid_dc = getRid(sql);
+    if(rid_dc==NULL){
+        free(rid_dh);
+        return NULL;
+    }
     
     printf("--------------------------------------------------[get objContent]\n");
     sprintf(sql,"SELECT data from #%s",rid_dc);
     printf("SQL: %s\n",sql);
     result = getContent(sql);
+    if(result==NULL){
+        free(rid_dh);
+        free(rid_dc);
+        return NULL;
+    }
     
     token = strtok(result,"\"");
     token = strtok(NULL,"\"");
@@ -1296,16 +1441,28 @@ Text getDiffDataAtheadByID(char* dataID){
     sprintf(sql,"SELECT @rid from (select expand(out('toDataHolder')) from Data where dataID ='%s')",dataID);
     printf("SQL: %s\n",sql);
     rid_dh = getRid(sql);
+    if(rid_dh==NULL){
+        return NULL;
+    }
     
     printf("--------------------------------------------------[get @rid head]\n");
     sprintf(sql,"SELECT in from (select expand(out_toDataContent) from #%s) where name = 'head')",rid_dh);
     printf("SQL: %s\n",sql);
     rid_dc = getRid(sql);
+    if(rid_dc==NULL){
+        free(rid_dh);
+        return NULL;
+    }
     
     printf("--------------------------------------------------[get objContent]\n");
     sprintf(sql,"SELECT data from #%s",rid_dc);
     printf("SQL: %s\n",sql);
     result = getContent(sql);
+    if(result==NULL){
+        free(rid_dh);
+        free(rid_dc);
+        return NULL;
+    }
     
     token = strtok(result,"\"");
     token = strtok(NULL,"\"");
@@ -1424,11 +1581,18 @@ ObjectBinary* getContentNextVerByID(char* dataID){
     sprintf(sql,"SELECT @rid from (select expand(out('toDataHolder')) from Data where dataID ='%s')",dataID);
     printf("SQL: %s\n",sql);
     rid_dh = getRid(sql);
+    if(rid_dh==NULL){
+        return NULL;
+    }
     
     printf("--------------------------------------------------[get @rid current]\n");
     sprintf(sql,"SELECT in from (select expand(out_toDataContent) from #%s) where name = 'current')",rid_dh);
     printf("SQL: %s\n",sql);
     rid_cur = getRid(sql);
+    if(rid_cur==NULL){
+        free(rid_dh);
+        return NULL;
+    }
     
     char* rid_dc[FULL_CONTENT];
     char* result_dc[FULL_CONTENT];
@@ -1456,6 +1620,18 @@ ObjectBinary* getContentNextVerByID(char* dataID){
             sprintf(sql,"SELECT isDiff,data from #%s",rid_dc[i]);
             printf("SQL: %s\n",sql);
             result_data = getContent(sql);
+            if(result_data==NULL){
+                free(rid_dh);
+                free(rid_cur);
+                int k;
+                for(k=0;k<=i;k++){
+                    free(rid_dc[k]);
+                    if(k!=0)
+                        free(result_dc[k-1]);
+                }
+                free(obj_ct);
+                return NULL;
+            }
             
             token = strtok(result_data, ":");
             token = strtok(NULL, ",");
@@ -1469,13 +1645,23 @@ ObjectBinary* getContentNextVerByID(char* dataID){
             result_dc[i] = strdup(token);
             printf("result_dc[%d]: %s\n",i,result_dc[i]);
             
-            // เป็น full ตั้งแต่ head
+            // เป็น full ตั้งแต่ 1st
             if(full_con==1 && i==0){
-                // retturn เลย
+                // return เลย
                 printf("--------------------------------------------------[get objContent_Schema]\n");
                 sprintf(sql,"SELECT xmlSchema from #%s",rid_dc[i]);
                 printf("SQL: %s\n",sql);
                 result_schema = getContent(sql);
+                if(result_schema==NULL){
+                    free(rid_dh);
+                    free(rid_cur);
+                    free(rid_dc[0]);
+                    free(result_data);
+                    free(result_dc[0]);
+                    free(obj_ct);
+                    return NULL;
+                }
+                
                 //printf("result_schema: %s\n",result_schema);
                 char* temp = (char*)malloc(sizeof(char)*MAX_SCHEMA);
                 memcpy(temp,result_schema+11,strlen(result_schema)-11);
@@ -1499,6 +1685,19 @@ ObjectBinary* getContentNextVerByID(char* dataID){
                 sprintf(sql,"SELECT xmlSchema from #%s",rid_dc[i]);
                 printf("SQL: %s\n",sql);
                 result_schema = getContent(sql);
+                if(result_schema==NULL){
+                    free(rid_dh);
+                    free(rid_cur);
+                    free(result_data);
+                    int k;
+                    for(k=0;k<=i;k++){
+                        free(rid_dc[k]);
+                        free(result_dc[k]);
+                    }
+                    free(obj_ct);
+                    return NULL;
+                }
+                
                 printf("result_schema: %s\n",result_schema);
                 char* temp = (char*)malloc(sizeof(char)*MAX_SCHEMA);
                 memcpy(temp,result_schema+11,strlen(result_schema)-11);
@@ -1553,11 +1752,18 @@ ObjectBinary* getContentPreVerByID(char* dataID){
     sprintf(sql,"SELECT @rid from (select expand(out('toDataHolder')) from Data where dataID ='%s')",dataID);
     printf("SQL: %s\n",sql);
     rid_dh = getRid(sql);
+    if(rid_dh==NULL){
+        return NULL;
+    }
     
     printf("--------------------------------------------------[get @rid current]\n");
     sprintf(sql,"SELECT in from (select expand(out_toDataContent) from #%s) where name = 'current')",rid_dh);
     printf("SQL: %s\n",sql);
     rid_cur = getRid(sql);
+    if(rid_cur==NULL){
+        free(rid_dh);
+        return NULL;
+    }
     
     char* rid_dc[FULL_CONTENT];
     char* result_dc[FULL_CONTENT];
@@ -1585,7 +1791,19 @@ ObjectBinary* getContentPreVerByID(char* dataID){
             sprintf(sql,"SELECT isDiff,data from #%s",rid_dc[i]);
             printf("SQL: %s\n",sql);
             result_data = getContent(sql);
-            
+            if(result_data==NULL){
+                free(rid_dh);
+                free(rid_cur);
+                int k;
+                for(k=0;k<=i;k++){
+                    free(rid_dc[k]);
+                    if(k!=0)
+                        free(result_dc[k-1]);
+                }
+                free(obj_ct);
+                return NULL;
+            }
+
             token = strtok(result_data, ":");
             token = strtok(NULL, ",");
             if(strcmp(token,"false")==0){
@@ -1598,13 +1816,23 @@ ObjectBinary* getContentPreVerByID(char* dataID){
             result_dc[i] = strdup(token);
             printf("result_dc[%d]: %s\n",i,result_dc[i]);
             
-            // เป็น full ตั้งแต่ head
+            // เป็น full ตั้งแต่ 1st
             if(full_con==1 && i==0){
-                // retturn เลย
+                // return เลย
                 printf("--------------------------------------------------[get objContent_Schema]\n");
                 sprintf(sql,"SELECT xmlSchema from #%s",rid_dc[i]);
                 printf("SQL: %s\n",sql);
                 result_schema = getContent(sql);
+                if(result_schema==NULL){
+                    free(rid_dh);
+                    free(rid_cur);
+                    free(rid_dc[0]);
+                    free(result_data);
+                    free(result_dc[0]);
+                    free(obj_ct);
+                    return NULL;
+                }
+                
                 //printf("result_schema: %s\n",result_schema);
                 char* temp = (char*)malloc(sizeof(char)*MAX_SCHEMA);
                 memcpy(temp,result_schema+11,strlen(result_schema)-11);
@@ -1628,6 +1856,19 @@ ObjectBinary* getContentPreVerByID(char* dataID){
                 sprintf(sql,"SELECT xmlSchema from #%s",rid_dc[i]);
                 printf("SQL: %s\n",sql);
                 result_schema = getContent(sql);
+                if(result_schema==NULL){
+                    free(rid_dh);
+                    free(rid_cur);
+                    free(result_data);
+                    int k;
+                    for(k=0;k<=i;k++){
+                        free(rid_dc[k]);
+                        free(result_dc[k]);
+                    }
+                    free(obj_ct);
+                    return NULL;
+                }
+                
                 printf("result_schema: %s\n",result_schema);
                 char* temp = (char*)malloc(sizeof(char)*MAX_SCHEMA);
                 memcpy(temp,result_schema+11,strlen(result_schema)-11);
@@ -1708,11 +1949,18 @@ Text getDiffDataNextVerByID(char* dataID){
     sprintf(sql,"SELECT @rid from (select expand(out('toDataHolder')) from Data where dataID ='%s')",dataID);
     printf("SQL: %s\n",sql);
     rid_dh = getRid(sql);
+    if(rid_dh==NULL){
+        return NULL;
+    }
     
     printf("--------------------------------------------------[get @rid current]\n");
     sprintf(sql,"SELECT in from (select expand(out_toDataContent) from #%s) where name = 'current')",rid_dh);
     printf("SQL: %s\n",sql);
     rid_cur = getRid(sql);
+    if(rid_cur==NULL){
+        free(rid_dh);
+        return NULL;
+    }
     
     printf("--------------------------------------------------[get @rid next_current]\n");
     sprintf(sql,"SELECT in from (select expand(out_toDiffContent) from #%s) where status = 'next')",rid_cur);
@@ -1730,6 +1978,12 @@ Text getDiffDataNextVerByID(char* dataID){
         sprintf(sql,"SELECT data from #%s",rid_next_cur);
         printf("SQL: %s\n",sql);
         result = getContent(sql);
+        if(result==NULL){
+            free(rid_dh);
+            free(rid_cur);
+            free(rid_next_cur);
+            return NULL;
+        }
     
         token = strtok(result,"\"");
         token = strtok(NULL,"\"");
@@ -1754,11 +2008,18 @@ Text getDiffDataPreVerByID(char* dataID){
     sprintf(sql,"SELECT @rid from (select expand(out('toDataHolder')) from Data where dataID ='%s')",dataID);
     printf("SQL: %s\n",sql);
     rid_dh = getRid(sql);
+    if(rid_dh==NULL){
+        return NULL;
+    }
     
     printf("--------------------------------------------------[get @rid current]\n");
     sprintf(sql,"SELECT in from (select expand(out_toDataContent) from #%s) where name = 'current')",rid_dh);
     printf("SQL: %s\n",sql);
     rid_cur = getRid(sql);
+    if(rid_cur==NULL){
+        free(rid_dh);
+        return NULL;
+    }
     
     printf("--------------------------------------------------[get @rid pre_current]\n");
     sprintf(sql,"SELECT in from (select expand(out_toDiffContent) from #%s) where status = 'pre')",rid_cur);
@@ -1776,6 +2037,12 @@ Text getDiffDataPreVerByID(char* dataID){
         sprintf(sql,"SELECT data from #%s",rid_pre_cur);
         printf("SQL: %s\n",sql);
         result = getContent(sql);
+        if(result==NULL){
+            free(rid_dh);
+            free(rid_cur);
+            free(rid_pre_cur);
+            return NULL;
+        }
         
         token = strtok(result,"\"");
         token = strtok(NULL,"\"");
@@ -1864,9 +2131,9 @@ Text getDataContentWithTag(Data* data, char* tagName){
 Text getDataContentWithTagByID(char* dataID, char* tagName){
     ObjectBinary* myobj;
     myobj = getDataContentByID(dataID);
-    
-    if(myobj==NULL)
+    if(myobj==NULL){
         return NULL;
+    }
     
     char* result;
     char* partial_result = (char*)malloc(sizeof(char)*(MAX_DIFF_SIZE/2));
@@ -2155,12 +2422,15 @@ const char* createOrg(Text orgName){
     printf("sql: %s\n",sql);
     ret = sendCommand(sql);
     
-    if (ret!=0)
+    if (ret!=0){
         printf("createOrg..FAILED\n");
-    else
+        free((char*)uuidstr);
+        return NULL;
+    }
+    else{
         printf("createOrg..PASS\n");
-    
-    return uuidstr;
+        return uuidstr;
+    }
 }
 
 const char* createUser(Text userName){
@@ -2177,12 +2447,15 @@ const char* createUser(Text userName){
     printf("sql: %s\n",sql);
     ret = sendCommand(sql);
     
-    if (ret!=0)
+    if (ret!=0){
         printf("createUser..FAILED\n");
-    else
+        free((char*)uuidstr);
+        return NULL;
+    }
+    else{
         printf("createUser..PASS\n");
-    
-    return uuidstr;
+        return uuidstr;
+    }
 }
 
 const char* createCategory(Text categoryName){
@@ -2196,12 +2469,15 @@ const char* createCategory(Text categoryName){
     printf("sql: %s\n",sql);
     ret = sendCommand(sql);
     
-    if (ret!=0)
+    if (ret!=0){
         printf("createCategory..FAILED(vertex)\n");
-    else
+        free((char*)uuidstr);
+        return NULL;
+    }
+    else{
         printf("createCategory..PASS(vertex)\n");
-    
-    return uuidstr;
+        return uuidstr;
+    }
 }
 
 const char* createData(Text dataName){
@@ -2215,13 +2491,15 @@ const char* createData(Text dataName){
     printf("sql: %s\n",sql);
     ret = sendCommand(sql);
     
-    if (ret!=0)
+    if (ret!=0){
         printf("createData..FAILED(vertex)\n");
-    else
+        free((char*)uuidstr);
+        return NULL;
+    }
+    else{
         printf("createData..PASS(vertex)\n");
-    
-    return uuidstr;
-    
+        return uuidstr;
+    }
 }
 
 Text getDataContent(char* schema, char* dataID, char* keyName){
@@ -2249,6 +2527,10 @@ Text getDataContent(char* schema, char* dataID, char* keyName){
         //  query
         char* partial_result;
         partial_result = getDataContentWithTagByID(dataID,keyName);
+        if(partial_result==NULL){
+            return NULL;
+        }
+        
         return partial_result;
     }
     else{
@@ -2265,12 +2547,18 @@ int addData2Category(char* categoryID, Data* data){
     printf("--------------------------------------------------[get @rid Category]\n");
     sprintf(sql,"SELECT @rid from Category where categoryID ='%s'",categoryID);
     rid_cat = getRid(sql);
+    if(rid_cat==NULL){
+        return 1;
+    }
     
     printf("--------------------------------------------------[create_vertex_Data]\n");
     sprintf(sql,"CREATE VERTEX Data set dataID='%s', dataName='mydata', chatRoom='%s'",data->dataID,data->chatRoom);
     ret = createVertex(sql);
-    if (ret!=0)
+    if (ret!=0){
         printf("addData2Category..FAILED(vertex_Data)\n");
+        free(rid_cat);
+        return ret;     // 1
+    }
     
     short cltid_d, cltid_dh;
     long rid_d, rid_dh;
@@ -2280,14 +2568,20 @@ int addData2Category(char* categoryID, Data* data){
     printf("--------------------------------------------------[create_edge_toData]\n");
     sprintf(sql,"CREATE EDGE toData from #%s to #%d:%lu",rid_cat,cltid_d,rid_d);
     ret = sendCommand(sql);
-    if (ret!=0)
+    if (ret!=0){
         printf("addData2Category..FAILED(edge_toData)\n");
+        free(rid_cat);
+        return ret;     // 1
+    }
     
     printf("--------------------------------------------------[create_vertex_DataHolder]\n");
     sprintf(sql,"CREATE VERTEX DataHolder set versionKeeped=%d, versionCount=%d, index_DevRef=%d",data->content->versionKeeped,data->content->versionCount,data->content->index_DevRef);
     ret = createVertex(sql);
-    if (ret!=0)
+    if (ret!=0){
         printf("addData2Category..FAILED(vertex_DataHolder)\n");
+        free(rid_cat);
+        return ret;     // 1
+    }
     
     cltid_dh = addr.cltid;
     rid_dh = addr.rid;
@@ -2295,8 +2589,11 @@ int addData2Category(char* categoryID, Data* data){
     printf("--------------------------------------------------[create_edge_toDataHolder]\n");
     sprintf(sql,"CREATE EDGE toDataHolder from #%d:%lu to #%d:%lu",cltid_d,rid_d,cltid_dh,rid_dh);
     ret = sendCommand(sql);
-    if (ret!=0)
+    if (ret!=0){
         printf("addData2Category..FAILED(edge_toDataHolder)\n");
+        free(rid_cat);
+        return ret;     // 1
+    }
     
     //  DataContent
     char addr_curr[20],addr_point[20];
@@ -2316,7 +2613,8 @@ int addData2Category(char* categoryID, Data* data){
         ret = createVertex(sql);
         if (ret!=0){
             printf("addData2Category..FAILED(vertex_DataContent)\n");
-            return -1;
+            free(rid_cat);
+            return ret;     // 1
         }
         
         //  current
@@ -2328,7 +2626,8 @@ int addData2Category(char* categoryID, Data* data){
             ret = sendCommand(sql);
             if (ret!=0){
                 printf("addData2Category..FAILED(edge_toDataContent_current)\n");
-                return -1;
+                free(rid_cat);
+                return ret;     // 1
             }
         }
         
@@ -2344,7 +2643,8 @@ int addData2Category(char* categoryID, Data* data){
             ret = sendCommand(sql);
             if (ret!=0){
                 printf("addData2Category..FAILED(edge_toDataContent_lastestCommon)\n");
-                return -1;
+                free(rid_cat);
+                return ret;     // 1
             }
         }
         else{
@@ -2359,7 +2659,8 @@ int addData2Category(char* categoryID, Data* data){
             ret = sendCommand(sql);
             if (ret!=0){
                 printf("addData2Category..FAILED(edge_toDiffContent_Pre)\n");
-                return -1;
+                free(rid_cat);
+                return ret;     // 1
             }
             
             //  create edge nextVersion
@@ -2369,7 +2670,8 @@ int addData2Category(char* categoryID, Data* data){
             ret = sendCommand(sql);
             if (ret!=0){
                 printf("addData2Category..FAILED(edge_toDiffContent_Next)\n");
-                return -1;
+                free(rid_cat);
+                return ret;     // 1
             }
             cltid_tmp = cltid_last;
             rid_tmp = rid_last;
@@ -2386,7 +2688,8 @@ int addData2Category(char* categoryID, Data* data){
         ret = sendCommand(sql);
         if (ret!=0){
             printf("addData2Category..FAILED(edge_toDataContent_head)\n");
-            return -1;
+            free(rid_cat);
+            return ret;     // 1
         }
     }
     else{
@@ -2396,7 +2699,8 @@ int addData2Category(char* categoryID, Data* data){
         ret = sendCommand(sql);
         if (ret!=0){
             printf("addData2Category..FAILED(edge_toDataContent_head)\n");
-            return -1;
+            free(rid_cat);
+            return ret;     // 1
         }
     }
     
@@ -2404,11 +2708,16 @@ int addData2Category(char* categoryID, Data* data){
     
     // เอา userID
     char* result;
-    char* uuidstr = (char*)malloc(sizeof(char)*33);
     printf("--------------------------------------------------[get userID]\n");
     sprintf(sql,"SELECT userID from (SELECT expand(in('toCategory')) from Category where categoryID='%s')",categoryID);
     result = getContent(sql);
+    if(result==NULL){
+        free(rid_cat);
+        return 1;
+    }
+    
     //printf("result: %s\n", result);
+    char* uuidstr = (char*)malloc(sizeof(char)*33);
     memcpy(uuidstr,result+8,strlen(result)-8-1);
     uuidstr[32] = '\0';
     
@@ -2417,6 +2726,12 @@ int addData2Category(char* categoryID, Data* data){
     printf("--------------------------------------------------[get @rid head]\n");
     sprintf(sql,"SELECT in from (select expand(out_toDataContent) from #%d:%lu) where name ='head'",cltid_dh,rid_dh);
     rid_dc = getRid(sql);
+    if(rid_dc==NULL){
+        free(rid_cat);
+        free(result);
+        free(uuidstr);
+        return 1;
+    }
     
     // เอาข้อมูลลง struct DeviceRef
     data->content->userDevicePtr[data->content->index_DevRef] = (DeviceRef*)malloc(sizeof(DeviceRef));
@@ -2434,7 +2749,10 @@ int addData2Category(char* categoryID, Data* data){
     ret = createVertex(sql);
     if (ret!=0){
         printf("addData2Category..FAILED(vertex_DeviceRef)\n");
-        return 1;
+        free(rid_cat);
+        free(result);
+        free(rid_dc);
+        return ret;     // 1
     }
     data->content->index_DevRef++;
     
@@ -2443,7 +2761,10 @@ int addData2Category(char* categoryID, Data* data){
     ret = sendCommand(sql);
     if (ret!=0){
         printf("addData2Category..FAILED(update_index_DevRef)\n");
-        return 1;
+        free(rid_cat);
+        free(result);
+        free(rid_dc);
+        return ret;     // 1
     }
     
     short cltid_dr;
@@ -2458,7 +2779,10 @@ int addData2Category(char* categoryID, Data* data){
     ret = sendCommand(sql);
     if (ret!=0){
         printf("addData2Category..FAILED(edge_fromDeviceRef)\n");
-        return 1;
+        free(rid_cat);
+        free(result);
+        free(rid_dc);
+        return ret;     // 1
     }
 
     free(rid_cat);
@@ -2477,31 +2801,55 @@ int addData2CategoryTest(char* categoryID, Data* data){
     printf("--------------------------------------------------[get @rid Category]\n");
     sprintf(sql,"SELECT @rid from Category where categoryID ='%s'",categoryID);
     rid_cat = getRid(sql);
+    if(rid_cat==NULL){
+        return 1;
+    }
     
     printf("--------------------------------------------------[get @rid Data]\n");
     sprintf(sql,"SELECT @rid from Data where dataID ='%s'",data->dataID);
     rid_d = getRid(sql);
+    if(rid_d==NULL){
+        free(rid_cat);
+        return 1;
+    }
     
     printf("--------------------------------------------------[get @rid DataHolder]\n");
     sprintf(sql,"SELECT @rid from (select expand(out('toDataHolder')) from #%s)",rid_d);
     rid_dh = getRid(sql);
+    if(rid_dh==NULL){
+        free(rid_cat);
+        free(rid_d);
+        return 1;
+    }
     
     printf("--------------------------------------------------[create_edge_toData]\n");
     sprintf(sql,"CREATE EDGE toData from #%s to #%s",rid_cat,rid_d);
     printf("SQL: %s\n",sql);
     ret = sendCommand(sql);
-    if (ret!=0)
+    if (ret!=0){
         printf("addData2CategoryTest..FAILED(edge_toData)\n");
+        free(rid_cat);
+        free(rid_d);
+        free(rid_dh);
+        return 1;
+    }
     
     /* for test DeviceRef */
     
     // เอา userID
     char* result;
-    char* uuidstr = (char*)malloc(sizeof(char)*33);
     printf("--------------------------------------------------[get userID]\n");
     sprintf(sql,"SELECT userID from (SELECT expand(in('toCategory')) from Category where categoryID='%s')",categoryID);
     result = getContent(sql);
+    if(result==NULL){
+        free(rid_cat);
+        free(rid_d);
+        free(rid_dh);
+        return 1;
+    }
+    
     //printf("result: %s\n", result);
+    char* uuidstr = (char*)malloc(sizeof(char)*33);
     memcpy(uuidstr,result+8,strlen(result)-8-1);
     uuidstr[32] = '\0';
     
@@ -2510,6 +2858,14 @@ int addData2CategoryTest(char* categoryID, Data* data){
     printf("--------------------------------------------------[get @rid head]\n");
     sprintf(sql,"SELECT in from (select expand(out_toDataContent) from #%s) where name='head'",rid_dh);
     rid_dc = getRid(sql);
+    if(rid_dc==NULL){
+        free(rid_cat);
+        free(rid_d);
+        free(rid_dh);
+        free(result);
+        free(uuidstr);
+        return 1;
+    }
     
     // เอาข้อมูลลง struct DeviceRef
     data->content->userDevicePtr[data->content->index_DevRef] = (DeviceRef*)malloc(sizeof(DeviceRef));
@@ -2527,8 +2883,15 @@ int addData2CategoryTest(char* categoryID, Data* data){
     ret = createVertex(sql);
     if (ret!=0){
         printf("addData2CategoryTest..FAILED(vertex_DeviceRef)\n");
-        return 1;
+        free(rid_cat);
+        free(rid_d);
+        free(rid_dh);
+        free(result);
+        //free(uuidstr);
+        free(rid_dc);
+        return ret;     // 1
     }
+    
     data->content->index_DevRef++;
     
     printf("--------------------------------------------------[update_index_DevRef]\n");
@@ -2536,7 +2899,13 @@ int addData2CategoryTest(char* categoryID, Data* data){
     ret = sendCommand(sql);
     if (ret!=0){
         printf("addData2CategoryTest..FAILED(update_index_DevRef)\n");
-        return 1;
+        free(rid_cat);
+        free(rid_d);
+        free(rid_dh);
+        free(result);
+        //free(uuidstr);
+        free(rid_dc);
+        return ret;     // 1
     }
     
     short cltid_dr;
@@ -2551,7 +2920,13 @@ int addData2CategoryTest(char* categoryID, Data* data){
     ret = sendCommand(sql);
     if (ret!=0){
         printf("addData2CategoryTest..FAILED(edge_fromDeviceRef)\n");
-        return 1;
+        free(rid_cat);
+        free(rid_d);
+        free(rid_dh);
+        free(result);
+        //free(uuidstr);
+        free(rid_dc);
+        return ret;     // 1
     }
 
     free(rid_cat);
@@ -2560,7 +2935,6 @@ int addData2CategoryTest(char* categoryID, Data* data){
     free(rid_dc);
     free(result);
     return 0;
-
 }
 
 int addCategory2User(char* userID, char* categoryID){
@@ -2572,15 +2946,21 @@ int addCategory2User(char* userID, char* categoryID){
     printf("--------------------------------------------------[get @rid User]\n");
     sprintf(sql,"SELECT @rid from User where userID ='%s'",userID);
     rid_user = getRid(sql);
+    if(rid_user==NULL){
+        return 1;
+    }
     
     printf("--------------------------------------------------[get @rid Category]\n");
     sprintf(sql,"SELECT @rid from Category where categoryID ='%s'",categoryID);
     rid_cat = getRid(sql);
+    if(rid_cat==NULL){
+        free(rid_user);
+        return 1;
+    }
     
     printf("--------------------------------------------------[create_edge_toCategory]\n");
     sprintf(sql,"CREATE EDGE toCategory from #%s to #%s",rid_user,rid_cat);
     ret = sendCommand(sql);
-    
     free(rid_user);
     free(rid_cat);
     return ret; //  1 = failed, 0 = success
@@ -2595,15 +2975,21 @@ int addUser2Org(char* orgID, char* userID){
     printf("--------------------------------------------------[get @rid Org]\n");
     sprintf(sql,"SELECT @rid from Org where orgID ='%s'",orgID);
     rid_org = getRid(sql);
+    if(rid_org==NULL){
+        return 1;
+    }
     
     printf("--------------------------------------------------[get @rid User]\n");
     sprintf(sql,"SELECT @rid from User where userID ='%s'",userID);
     rid_user = getRid(sql);
+    if(rid_user==NULL){
+        free(rid_org);
+        return 1;
+    }
     
     printf("--------------------------------------------------[create_edge_toUser]\n");
     sprintf(sql,"CREATE EDGE toUser from #%s to #%s",rid_org,rid_user);
     ret = sendCommand(sql);
-    
     free(rid_org);
     free(rid_user);
     return ret; //  1 = failed, 0 = success
@@ -2619,7 +3005,6 @@ Data* queryDataByID(char* dataID){
     sprintf(sql,"SELECT dataName,chatRoom from Data where dataID ='%s'",dataID);
     printf("SQL: %s\n",sql);
     result = getContent(sql);
-    
     if(result==NULL){
         printf("FAILED >> incorrect dataID\n");
         return NULL;
@@ -2643,7 +3028,6 @@ Data* queryDataByID(char* dataID){
     sprintf(sql,"SELECT @rid from (select expand(out('toDataHolder')) from Data where dataID ='%s')",dataID);
     printf("SQL: %s\n",sql);
     rid_dh = getRid(sql);
-    
     if(rid_dh == NULL){
         printf("no DataHolder in this dataID\n");
         free(rid_dh);
@@ -2821,7 +3205,6 @@ Category** queryCategoryByID(char* dataID){
     sprintf(sql,"SELECT count(*) from (select expand(in('toData')) from Data where dataID='%s')",dataID);
     //printf("SQL: %s\n",sql);
     result = getContent(sql);
-    
     if(result==NULL){
         printf("FAILED >> incorrect dataID\n");
         return NULL;
@@ -2832,19 +3215,39 @@ Category** queryCategoryByID(char* dataID){
     count = atoi(token);
     printf("count: %d\n",count);
     
-    Category** catPtr = (Category**)malloc(sizeof(Category*)*count+1);
-    for(i=0;i<count;i++)
-        catPtr[i] = (Category*)malloc(sizeof(Category));
-    
     char* result_data[count];
     char** result_rid;
     sprintf(sql,"SELECT @rid from (select expand(in('toData')) from Data where dataID='%s')",dataID);
     result_rid = getArrayRid(sql);
+    if(result_rid==NULL){
+        free(result);
+        return NULL;
+    }
+    
+    Category** catPtr = (Category**)malloc(sizeof(Category*)*count+1);
+    for(i=0;i<count;i++)
+        catPtr[i] = (Category*)malloc(sizeof(Category));
     
     for(i=0;i<count;i++){
         sprintf(sql,"SELECT categoryID,categoryName from %s",result_rid[i]);
         printf("SQL: %s\n",sql);
         result_data[i] = getContent(sql);
+        if(result_data[i]==NULL){
+            free(result);
+            int k;
+            for(k=0;k<count;k++){
+                free(result_rid[k]);
+                if(k<i){
+                    free(result_data[k]);
+                    free((char*)catPtr[k]->categoryID);
+                    free(catPtr[k]);
+                }
+            }
+            free(result_rid);
+            free(catPtr);
+            return NULL;
+        }
+        
         token = strtok(result_data[i], "\"");
         token = strtok(NULL, "\"");
         //printf("catID: %s\n",token);
@@ -2881,7 +3284,6 @@ User** queryUserByID(char* dataID){
     sprintf(sql,"SELECT count(*) from (select expand(in('toData').in('toCategory')) from Data where dataID='%s')",dataID);
     //printf("SQL: %s\n",sql);
     result = getContent(sql);
-    
     if(result==NULL){
         printf("FAILED >> incorrect dataID\n");
         return NULL;
@@ -2892,19 +3294,39 @@ User** queryUserByID(char* dataID){
     count = atoi(token);
     printf("count: %d\n",count);
     
-    User** usrPtr = (User**)malloc(sizeof(User*)*count+1);
-    for(i=0;i<count;i++)
-        usrPtr[i] = (User*)malloc(sizeof(User));
-    
     char* result_data[count];
     char** result_rid;
     sprintf(sql,"SELECT @rid from (select expand(in('toData').in('toCategory')) from Data where dataID='%s')",dataID);
     result_rid = getArrayRid(sql);
+    if(result_rid==NULL){
+        free(result);
+        return NULL;
+    }
+    
+    User** usrPtr = (User**)malloc(sizeof(User*)*count+1);
+    for(i=0;i<count;i++)
+        usrPtr[i] = (User*)malloc(sizeof(User));
     
     for(i=0;i<count;i++){
         sprintf(sql,"SELECT userID,userName from %s",result_rid[i]);
         printf("SQL: %s\n",sql);
         result_data[i] = getContent(sql);
+        if(result_data[i]==NULL){
+            free(result);
+            int k;
+            for(k=0;k<count;k++){
+                free(result_rid[k]);
+                if(k<i){
+                    free(result_data[k]);
+                    free((char*)usrPtr[k]->userID);
+                    free(usrPtr[k]);
+                }
+            }
+            free(result_rid);
+            free(usrPtr);
+            return NULL;
+        }
+        
         token = strtok(result_data[i], "\"");
         token = strtok(NULL, "\"");
         usrPtr[i]->userID = strdup(token);
@@ -3053,18 +3475,24 @@ DeviceRef** getDeviceRefListByID(char* dataID){
     sprintf(sql,"SELECT @rid from (select expand(out('toDataHolder')) from Data where dataID ='%s')",dataID);
     printf("SQL: %s\n",sql);
     rid_dh = getRid(sql);
+    if(rid_dh==NULL){
+        return NULL;
+    }
     
     printf("--------------------------------------------------[get @rid lastestCommon]\n");
     sprintf(sql,"SELECT index_DevRef from #%s",rid_dh);
     printf("SQL: %s\n",sql);
     result = getContent(sql);
+    if(result==NULL){
+        free(rid_dh);
+        return NULL;
+    }
     
     token = strtok(result, ":");
     token = strtok(NULL, "\n");
     
     int index_DevRef = atoi(token);
     printf("index: %d\n",index_DevRef);
-    
     if(index_DevRef==0){
         free(rid_dh);
         free(result);
@@ -3075,6 +3503,11 @@ DeviceRef** getDeviceRefListByID(char* dataID){
     char** result_rid;
     sprintf(sql,"SELECT out from fromDeviceRef where in = #%s",rid_dh);
     result_rid = getArrayRid(sql);
+    if(result_rid==NULL){
+        free(rid_dh);
+        free(result);
+        return NULL;
+    }
     DeviceRef** devRef = (DeviceRef**)malloc(sizeof(DeviceRef*)*index_DevRef+1);
     
     int i;
@@ -3082,6 +3515,24 @@ DeviceRef** getDeviceRefListByID(char* dataID){
         sprintf(sql,"SELECT userID,deviceTransportID,nodeRefToDataContent from %s",result_rid[i]);
         printf("SQL: %s\n",sql);
         result_data[i] = getContent(sql);
+        if(result_data[i]==NULL){
+            free(rid_dh);
+            free(result);
+            int k;
+            for(k=0;k<index_DevRef;k++){
+                free(result_rid[k]);
+                if(k<i){
+                    free(result_data[k]);
+                    free((char*)devRef[k]->userID);
+                    free((char*)devRef[k]->deviceTransportID);
+                    free(devRef[k]);
+                }
+            }
+            free(devRef);
+            free(result_rid);
+            return NULL;
+        }
+        
         printf("result_data[%d]: %s\n",i,result_data[i]);
         
         devRef[i] = (DeviceRef*)malloc(sizeof(DeviceRef));
@@ -4241,6 +4692,7 @@ void testqueryDataByID(){
     openDatabase(DB_NAME);
     mydata = queryDataByID("9703242D76F7426E9807390044AC366D");
     disconnectServer();
+    
 //    Data* _mydata;
 //    _mydata = queryDataByID("3DA75AF92ABB42D78E86AB767BD69BE4");
 //    
@@ -4305,6 +4757,7 @@ void testqueryDataByID(){
     writeData2PersistentQ(queue,NULL,_getDataContentCommonVersionByID,"9703242D76F7426E9807390044AC366D");
     writeData2PersistentQ(queue,NULL,_getDataContentByID,"9703242D76F7426E9807390044AC366D");
     isDataEmpty(queue);
+    printf("FLUSH\n.\n.\n.\n.\n.\n.\n.\n");
     ret = flushData(queue);
     printf("ret: %d\n",ret);
     isDataEmpty(queue);

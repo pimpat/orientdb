@@ -19,7 +19,7 @@ int reqRecCreateMsg(char *message, short clusterId, char *recordContect);
 int reqCommandMsg(char *message, char *className, char *command);
 int reqQueryMsg(char *message, char *className, char *query);
 int reqQueryMsg_Binary(char *message, char *className, char *query);
-
+int reqTX_Commit(char *message, int tx, char* tx_entry);
 
 #define REQUEST_SHUTDOWN    1
 #define REQUEST_CONNECT     2
@@ -39,6 +39,7 @@ int reqQueryMsg_Binary(char *message, char *className, char *query);
 #define REQUEST_RECORD_UPDATE   32
 #define REQUEST_RECORD_DELETE   33
 #define REQUEST_COMMAND     41
+#define REQUEST_TX_COMMIT   60
 
 #ifdef __cplusplus
 }

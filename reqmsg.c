@@ -43,7 +43,7 @@ int addLong(long num ,char *buffer) {
 }
 int addString(char *str, char *buffer) {
     if (str != NULL) {
-        int len = strlen(str);
+        int len = (int)strlen(str);
         addInt(len, buffer);
         memcpy(buffer+4, str, len);
         return sizeof(int)+len;
@@ -123,9 +123,34 @@ int reqRecLoadMsg(char *message, short clusterId, long clusterPos) {
     return size;
 }
 
+int reqTX_Commit(char *message, int tx, char* tx_entry) {
+    int size = 0;
+    size += addInt(tx, message+size);   // tx-id
+    size += addByte(1, message+size);   // using tx-log
+    size += addByte(3, message+size);   // operation-type
+//    size += addInt((int)strlen(tx_entry)+sizeof(short)+sizeof(long)+2*sizeof(char), message+size);
+    
+
+//    size += addInt(3,message+size);
+//        size += addShort(11, message+size);  // cluster-id
+//        size += addLong(79, message+size);   // cluster-pos
+        size += addByte('d', message+size); // record-type
+    
+    
+    size += addString(tx_entry, message+size);  // entry-content
+    size += addByte(0, message+size);
+//    printf("size: %d\n",size-(2+sizeof(int)));
+    //size += addInt(size-(2+sizeof(int)+4), message+(2+sizeof(int)));
+    
+//    size += addByte('d', message+size); // record-type
+//    size += addByte(0, message+size);   // end-of-records
+    return size;
+}
+
+//  this func
 int reqRecCreateMsg(char *message, short clusterId, char *recordContent) {
     int size = 0;
-    size += addInt(-1, message+size);
+    //size += addInt(-1, message+size);
     size += addShort(clusterId, message+size);
     size += addString(recordContent, message+size);
     size += addByte('d', message+size);
