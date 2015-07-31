@@ -50,9 +50,9 @@ Addr addr;
 
 //----------------------------------
 
-typedef struct ChatRef{
-    const char* chatRefURL;
-} ChatRef;
+//typedef struct ChatRef{
+//    const char* chatRefURL;
+//} ChatRef;
 
 typedef struct CWTimeStamp{
     char* timeStampCode;
@@ -90,10 +90,11 @@ struct DataHolder{
 
 typedef struct Data{
     const char* dataID;
+    char* dataName;
     int dataType;
     DataHolder* content;
     Text* attachmentFTOLinks;   //  NULL
-    ChatRef* chatRoom;          //  NULL
+    char* chatRoom;          //  NULL
 } Data;
 
 typedef Data Org;
@@ -110,7 +111,6 @@ Data* mydata = NULL;
 
 enum DATATYPE {
     _data,
-    _attachmentFTOLinks,
     _subTask,
     _task,
     _state,
@@ -119,14 +119,23 @@ enum DATATYPE {
     _org
 };
 
+//enum TAGNAME {
+//    book_id,
+//    author,
+//    title,
+//    genre,
+//    price,
+//    publish_date,
+//    description
+//};
+
 enum TAGNAME {
-    book_id,
-    author,
-    title,
-    genre,
-    price,
-    publish_date,
-    description
+//    _dataID,
+//    _dataType,
+//    _dataName,
+    _attachmentFTOLinks,
+    _chatRoom,
+    _content
 };
 
 /* binary protocol */
@@ -148,10 +157,21 @@ char** getArrayRid(char* query);
 
 /* datamodel function */
 const char* stringUUID();
-const char* createNewData(int dataType);
+const char* createNewData(int dataType);                // global Data
+const char* _createNewData(Data** data, int dataType);  // local Data
 DataHolder* createNewDataHolder();
 ObjectBinary* createNewObjBinary(char* data);
 int countDataContent(Data* data);
+
+void setDataName(Data* data, char* dataName);
+char* getDataName(Data* data);
+void setChatRoom(Data* data, char* chatRoom);
+char* getChatRoom(Data* data);
+
+//ReturnErr setDataNameByID(char* dataID, char* dataName);
+//char* getDataNameByID(char* dataID);
+//ReturnErr setChatRoomByID(char* dataID, char* chatRoom);
+//char* getChatRoomByID(char* dataID);
 
 ObjectBinary* getDataContent(Data* data);
 ObjectBinary* getDataContentLastestCommon(Data* data);
@@ -173,15 +193,15 @@ Text getDiffDataPreVer(Data* data);
 //Text getDiffDataNextVerByID(char* dataID);
 //Text getDiffDataPreVerByID(char* dataID);
 
-Text getDataContentWithTag(Data* data, char* tagName);
+Text getDataContentWithTag(Data* data, char* tagName, char* id);
 //Text getDataContentWithTagByID(char* dataID, char* tagName);
 
 ReturnErr setNewDataContent(Data* data, ObjectBinary* content);
-ReturnErr setNewDataDiffWithTag(Data* data, char* tagName, Text diff);
+ReturnErr setNewDataDiffWithTag(Data* data, char* tagName, char* id, Text diff);
 
-Text getTagContentWithName(ObjectBinary* fullContent, char* tagName);
-Text getTagContent(ObjectBinary* fullContent, int tagNameEnum);
-ReturnErr setTagContent(ObjectBinary* fullContent, Text newTagContent, char* tagName);
+Text getTagContentWithName(ObjectBinary* fullContent, char* tagName, char* id);
+Text getTagContent(ObjectBinary* fullContent, int tagNameEnum, char* id);
+ReturnErr setTagContent(ObjectBinary* fullContent, Text newTagContent, char* tagName, char* id);
 
 //const char* createOrg(Text orgName, Schema* orgSchema);
 //const char* createUser(Text userName, Schema* userSchema);
@@ -189,8 +209,8 @@ ReturnErr setTagContent(ObjectBinary* fullContent, Text newTagContent, char* tag
 //const char* createState(Text stateName, Schema* stateSchema);
 //const char* createTask(Text taskName, Schema* );
 //const char* createSubTask(Text subTaskName);
-//const char* createData(Text dataName, Schema* dataSchema);
-//
+const char* createData(Text dataName, Schema* dataSchema, int dType);
+
 //Text getDataContentForKey(Schema* schema, uuid_t objID, char* keyName);
 //
 //ReturnErr addData2Category(char* categoryID, Data* data);
@@ -227,12 +247,26 @@ ReturnErr setTagContent(ObjectBinary* fullContent, Text newTagContent, char* tag
 string getDiff(char* old_str, char* new_str);
 string getPatch(char* str, char* str_patch);
 
-void testDiffPatchXML();
+void test_setNewData();
+void test_getData(Data** data);
+void testCRUD();
+
+void setVal(int* num);
+void setVal(int* num){
+    *num = 8;
+}
 
 int main() {
-    testDiffPatchXML();
+    test_setNewData();
+//    testCRUD();
+//    int x =6;
+//    setVal(&x);
+//    printf("%d\n",x);
+    
     return 0;
 }
+
+
 
 int connectSocket() {
     int sockfd;
@@ -384,10 +418,6 @@ int prepareDB() {
     ret = createClass("toSubTask","E");
     if (ret!=0) return 1;
     
-    /* Edge toAttachmentFTOLinks */
-    ret = createClass("toAttachmentFTOLinks","E");
-    if (ret!=0) return 1;
-    
     /* Data */
     ret = createClass("Data","V");
     if (ret!=0) return 1;
@@ -400,9 +430,13 @@ int prepareDB() {
     if (ret!=0) return 1;
     //printf("CREATE PROPERTY Data.dataType INTEGER: OK!\n");
     
-    ret = sendCommand("CREATE PROPERTY Data.attachmentFTOLinks EMBEDDEDLIST STRING");
+    ret = sendCommand("CREATE PROPERTY Data.dataName STRING");
     if (ret!=0) return 1;
-    //printf("CREATE PROPERTY Data.attachmentFTOLinks EMBEDDEDLIST STRING: OK!\n");
+    //printf("CREATE PROPERTY Data.dataName STRING: OK!\n");
+    
+//    ret = sendCommand("CREATE PROPERTY Data.attachmentFTOLinks EMBEDDEDLIST STRING");
+//    if (ret!=0) return 1;
+//    //printf("CREATE PROPERTY Data.attachmentFTOLinks EMBEDDEDLIST STRING: OK!\n");
     
     ret = sendCommand("CREATE PROPERTY Data.chatRoom STRING");
     if (ret!=0) return 1;
@@ -468,13 +502,13 @@ int prepareDB() {
     ret = sendCommand("CREATE PROPERTY DataContent.full_data STRING");
     if (ret!=0) return 1;
     
-    /* Edge toObjectBinary */
-    ret = createClass("toObjectBinary","E");
+    /* Edge toContent */
+    ret = createClass("toContent","E");
     if (ret!=0) return 1;
     
-    ret = sendCommand("CREATE PROPERTY toObjectBinary.type STRING");
+    ret = sendCommand("CREATE PROPERTY toContent.type STRING");
     if (ret!=0) return 1;
-    //printf("CREATE PROPERTY toObjectBinary.type STRING: OK!\n");
+    //printf("CREATE PROPERTY toContent.type STRING: OK!\n");
     
     /* Edge toDataHolder_fromDC */
     ret = createClass("toDataHolder_fromDC","E");
@@ -853,11 +887,25 @@ const char* createNewData(int dataType){
     mydata = (Data*)malloc(sizeof(Data));
     mydata->dataID = stringUUID();
     printf("dataID: %s\n",mydata->dataID);
-    mydata->dataType = dataType;   // fix
+    mydata->dataName = NULL;
+    mydata->dataType = dataType;
     mydata->content = createNewDataHolder();
     mydata->attachmentFTOLinks = NULL;
     mydata->chatRoom = NULL;
     return mydata->dataID;
+}
+
+const char* _createNewData(Data** data, int dataType){
+    *data = (Data*)malloc(sizeof(Data));
+    Data* dt = *data;
+    dt->dataID = stringUUID();
+    printf("dataID: %s\n",dt->dataID);
+    dt->dataName = NULL;
+    dt->dataType = dataType;
+    dt->content = createNewDataHolder();
+    dt->attachmentFTOLinks = NULL;
+    dt->chatRoom = NULL;
+    return dt->dataID;
 }
 
 DataHolder* createNewDataHolder(){
@@ -879,12 +927,51 @@ ObjectBinary* createNewObjBinary(char* data){
 
 int countDataContent(Data* data){
     DataContent* dc = data->content->lastestCommon;
-    int i=0;
+    int i=1;
     while(dc!=NULL){
         i++;
         dc = dc->nextVersion;
     }
     return i;
+}
+
+void setDataName(Data* data, char* dataName){
+    if(data->dataName == NULL){
+        data->dataName = strdup(dataName);
+    }
+    else{
+        free(data->dataName);
+        data->dataName = strdup(dataName);
+    }
+}
+char* getDataName(Data* data){
+    if(data->dataName != NULL){
+        char* result = strdup(data->dataName);
+        return result;
+    }
+    else{
+        return NULL;
+    }
+}
+
+void setChatRoom(Data* data, char* chatRoom){
+    if(data->chatRoom == NULL){
+        data->chatRoom = strdup(chatRoom);
+    }
+    else{
+        free(data->chatRoom);
+        data->chatRoom = strdup(chatRoom);
+    }
+}
+
+char* getChatRoom(Data* data){
+    if(data->chatRoom != NULL){
+        char* result = strdup(data->chatRoom);
+        return result;
+    }
+    else{
+        return NULL;
+    }
 }
 
 ObjectBinary* getDataContent(Data* data){
@@ -898,28 +985,35 @@ ObjectBinary* getDataContent(Data* data){
 }
 
 ObjectBinary* getDataContentLastestCommon(Data* data){
+    //  for test
+    //    data->content->lastestCommon = data->content->lastestCommon->nextVersion;
+    //    data->content->lastestCommon->preVersion = NULL;
     if(data->content->head != NULL){
-        char* init_str = strdup(data->content->head->fullContent->data);
-        string s;
-        DataContent *mydc, *prev_mydc;
-        for(mydc=data->content->head->preVersion;mydc!=NULL;mydc=prev_mydc){
-            prev_mydc = mydc->preVersion;
-            if(mydc->minusPatch != NULL){
+        if(data->content->lastestCommon->fullContent != NULL && data->content->lastestCommon->plusPatch == NULL){
+            ObjectBinary* result = createNewObjBinary(data->content->lastestCommon->fullContent->data);
+            return result;
+        }
+        else{
+            char* init_str = strdup(data->content->head->fullContent->data);
+            string s;
+            DataContent *mydc, *prev_mydc;
+            for(mydc=data->content->head->preVersion;mydc!=NULL;mydc=prev_mydc){
+                prev_mydc = mydc->preVersion;
                 s = getPatch(init_str, mydc->minusPatch->data);
                 free(init_str);
                 init_str = strdup(s.c_str());
             }
+            ObjectBinary* result = createNewObjBinary(init_str);
+            free(init_str);
+            return result;
         }
-        ObjectBinary* result = createNewObjBinary(init_str);
-        free(init_str);
-        return result;
     }
     else
         return NULL;
 }
 
 Text getDiffDataAtHead(Data* data){
-    if(data->content->head != NULL){
+    if(data->content->head != NULL && data->content->head->plusPatch != NULL){
         char* result = strdup(data->content->head->plusPatch->data);
         return result;
     }
@@ -928,7 +1022,9 @@ Text getDiffDataAtHead(Data* data){
 }
 
 Text getDiffDataAtLastestCommon(Data* data){
-    if(data->content->lastestCommon != NULL){
+    //  for test
+    //    data->content->lastestCommon = data->content->lastestCommon->nextVersion;
+    if(data->content->lastestCommon != NULL && data->content->lastestCommon->plusPatch != NULL){
         char* result = strdup(data->content->lastestCommon->plusPatch->data);
         return result;
     }
@@ -958,11 +1054,9 @@ ObjectBinary* getContentNextVer(Data* data){
                 if(i==0)
                     break;
                 prev_mydc = mydc->preVersion;
-                if(mydc->minusPatch != NULL){
-                    s = getPatch(init_str, mydc->minusPatch->data);
-                    free(init_str);
-                    init_str = strdup(s.c_str());
-                }
+                s = getPatch(init_str, mydc->minusPatch->data);
+                free(init_str);
+                init_str = strdup(s.c_str());
                 i--;
             }
             ObjectBinary* result = createNewObjBinary(init_str);
@@ -977,7 +1071,7 @@ ObjectBinary* getContentNextVer(Data* data){
 }
 
 ObjectBinary* getContentPreVer(Data* data){
-    if(data->content->current != NULL && data->content->current->preVersion->plusPatch != NULL){
+    if(data->content->current != NULL && data->content->current->preVersion != NULL){
         if(data->content->current->preVersion->fullContent!= NULL){
             ObjectBinary* result = createNewObjBinary(data->content->current->preVersion->fullContent->data);
             return result;
@@ -989,7 +1083,6 @@ ObjectBinary* getContentPreVer(Data* data){
                 i++;
                 dc = dc->nextVersion;
             }
-//            i=i+1;
 //            printf("i: %d\n",i);
             
             char* init_str = strdup(data->content->head->fullContent->data);
@@ -999,11 +1092,9 @@ ObjectBinary* getContentPreVer(Data* data){
                 if(i==0)
                     break;
                 prev_mydc = mydc->preVersion;
-                if(mydc->minusPatch != NULL){
-                    s = getPatch(init_str, mydc->minusPatch->data);
-                    free(init_str);
-                    init_str = strdup(s.c_str());
-                }
+                s = getPatch(init_str, mydc->minusPatch->data);
+                free(init_str);
+                init_str = strdup(s.c_str());
                 i--;
             }
             ObjectBinary* result = createNewObjBinary(init_str);
@@ -1029,9 +1120,15 @@ Text getDiffDataNextVer(Data* data){
 }
 
 Text getDiffDataPreVer(Data* data){
-    if(data->content->current != NULL && data->content->current->preVersion->plusPatch != NULL){
-        char* result = strdup(data->content->current->preVersion->plusPatch->data);
-        return result;
+    if(data->content->current != NULL && data->content->current->preVersion != NULL){
+        if(data->content->current->preVersion->plusPatch != NULL){
+            char* result = strdup(data->content->current->preVersion->plusPatch->data);
+            return result;
+        }
+        else{
+            printf("\n*** PreVersion is initial xml\n");
+            return NULL;
+        }
     }
     else{
         printf("\n*** Now current is pointing to lastestCommon\n");
@@ -1039,7 +1136,7 @@ Text getDiffDataPreVer(Data* data){
     }
 }
 
-Text getDataContentWithTag(Data* data, char* tagName){
+Text getDataContentWithTag(Data* data, char* tagName, char* id){
     char* full_xml = strdup(data->content->head->fullContent->data);
     ezxml_t root = ezxml_parse_str(full_xml,strlen(full_xml));
     ezxml_t partial_data = ezxml_get(root,tagName,-1);
@@ -1051,6 +1148,30 @@ Text getDataContentWithTag(Data* data, char* tagName){
         return NULL;
     }
     
+    ezxml_t link;
+    char* link_id;
+    int exist = 0;
+    
+    if(strcmp(tagName,"attachmentFTOLinks")==0){
+        for(link = ezxml_child(partial_data, "link");link;link=link->next){
+            link_id = (char*)ezxml_attr(link, "id");
+            printf("link_id: %s\n",link_id);
+            if(strcmp(link_id,id)==0){
+                exist=1;
+                break;
+            }
+        }
+        if(exist==1){
+            partial_data = link;
+        }
+        else{
+            printf("FAILED >> incorrect id\n");
+            free(full_xml);
+            ezxml_free(root);
+            return NULL;
+        }
+    }
+    
     printf("val: %s\n",partial_data->txt);
     char* result = strdup(partial_data->txt);
     free(full_xml);
@@ -1059,28 +1180,22 @@ Text getDataContentWithTag(Data* data, char* tagName){
 }
 
 ReturnErr setNewDataContent(Data* data, ObjectBinary* content){
-    if(data->content->head==NULL && data->content->lastestCommon==NULL){
-        printf("\n[ DATA #1 ]\n");
-        //  <root></root>
+    int total = countDataContent(data);
+    printf("\n[ DATA #%d ]\n",total);
+    if(data->content->head==NULL && data->content->lastestCommon==NULL && data->content->current==NULL){
         DataContent* dc0 = (DataContent*)malloc(sizeof(DataContent));
         
-        //  (none) +A <root>A</root>
-        DataContent* dc1 = (DataContent*)malloc(sizeof(DataContent));
-        
         DataHolder* dh = data->content;
-//        dh->lastestCommon = dc0;
-        dh->lastestCommon = dc1;
-        dh->head = dc1;
-        dh->current = dc1;
+        dh->lastestCommon = dc0;
+        dh->head = dc0;
+        dh->current = dc0;
         
         dc0->preVersion = NULL;
-        dc0->nextVersion = dc1;
-        dc1->preVersion = dc0;
-        dc1->nextVersion = NULL;
+        dc0->nextVersion = NULL;
         
         //  dc0 ------------------------------------------------------------
         dc0->dataHd = dh;
-        dc0->SHA256hashCode = strdup("default");
+        dc0->SHA256hashCode = strdup("default_hashcode");
         dc0->timeStamp = NULL;
         dc0->isDiff = FALSE;
         
@@ -1088,9 +1203,8 @@ ReturnErr setNewDataContent(Data* data, ObjectBinary* content){
         ObjectBinary* obj0 = (ObjectBinary*)malloc(sizeof(ObjectBinary));
         dc0->fullContent = obj0;
         obj0->schemaCode = content->schemaCode;
-        obj0->data = strdup("<root></root>");
-        
-        obj0->byteCount = (int)strlen(obj0->data);
+        obj0->data = strdup(content->data);
+        obj0->byteCount = content->byteCount;
         
         //  dc0->minusPatch
         dc0->minusPatch = NULL;
@@ -1098,43 +1212,10 @@ ReturnErr setNewDataContent(Data* data, ObjectBinary* content){
         //  dc0->plusPatch
         dc0->plusPatch = NULL;
         
-        //  dc1 ------------------------------------------------------------
-        dc1->dataHd = dh;
-        dc1->SHA256hashCode = strdup("default");
-        dc1->timeStamp = NULL;
-        dc1->isDiff = FALSE;
-        
-        //  dc1->fullContent
-        ObjectBinary* obj1_full = (ObjectBinary*)malloc(sizeof(ObjectBinary));
-        dc1->fullContent = obj1_full;
-        obj1_full->schemaCode = content->schemaCode;
-        obj1_full->data = strdup(content->data);
-        obj1_full->byteCount = content->byteCount;
-        
-        //  dc1->minusPatch
-        dc1->minusPatch = NULL;
-        
-        //  dc1->plusPatch
-        ObjectBinary* obj1_plus = (ObjectBinary*)malloc(sizeof(ObjectBinary));
-        dc1->plusPatch = obj1_plus;
-        
-        obj1_plus->schemaCode = content->schemaCode;
-        
-        string s = getDiff(obj0->data,obj1_full->data);
-        obj1_plus->data = strdup(s.c_str());
-        obj1_plus->byteCount = (int)strlen(obj1_plus->data);
-        
-        printf("init: %s\n",obj0->data);
-        printf("new: %s\n",obj1_full->data);
-        printf("diff: %s\n",obj1_plus->data);
-        
-        return obj1_plus->byteCount;
-        
+        printf("full: %s\n",obj0->data);
+        return obj0->byteCount;
     }
     else{
-        int total = countDataContent(data);
-        printf("\n[ DATA #%d ]\n",total);
-        
         DataContent* dc0 = data->content->head;                             //  old
         DataContent* dc1 = (DataContent*)malloc(sizeof(DataContent));       //  new
         
@@ -1170,10 +1251,10 @@ ReturnErr setNewDataContent(Data* data, ObjectBinary* content){
         obj0_minus->byteCount = (int)strlen(obj0_minus->data);
         
         //  dc0->plusPatch (not change)
-        
+
         //  dc1 ------------------------------------------------------------
         dc1->dataHd = dh;
-        dc1->SHA256hashCode = strdup("default");
+        dc1->SHA256hashCode = strdup("default_hashcode");
         dc1->timeStamp = NULL;
         dc1->isDiff = FALSE;
         
@@ -1194,138 +1275,273 @@ ReturnErr setNewDataContent(Data* data, ObjectBinary* content){
         obj1_plus->data = strdup(s_plus.c_str());
         obj1_plus->byteCount = (int)strlen(obj1_plus->data);
         
+        printf("\n--- Check old/new data ---\n");
+        if(dc0->minusPatch != NULL)
+            printf("minus_old: %s\n",dc0->minusPatch->data);
+        if(dc0->plusPatch != NULL)
+            printf("plus_old: %s\n",dc0->plusPatch->data);
+        if(dc0->fullContent != NULL)
+            printf("full_old: %s\n",dc0->fullContent->data);
+        if(dc1->minusPatch != NULL)
+            printf("minus_new: %s\n",dc1->minusPatch->data);
+        if(dc1->plusPatch != NULL)
+            printf("plus_new: %s\n",dc1->plusPatch->data);
+        if(dc1->fullContent != NULL)
+            printf("full_new: %s\n",dc1->fullContent->data);
+        
         return obj1_plus->byteCount;
     }
 }
 
-ReturnErr setNewDataDiffWithTag(Data* data, char* tagName, Text diff){
+ReturnErr setNewDataDiffWithTag(Data* data, char* tagName, char* id, Text diff){
     printf("\n--- setNewDataDiffWithTag ---\n");
     DataContent* dc_old = data->content->head;
     char* old_xml = strdup(dc_old->fullContent->data);
     
     ezxml_t root = ezxml_parse_str(old_xml,strlen(old_xml));
-    ezxml_t partial_data = ezxml_get(root,tagName,-1);
-    if(partial_data==NULL) {
-        printf("FAILED >> incorrect tag\n");
-        free(old_xml);
-        ezxml_free(root);
-        return -1;
+    ezxml_t link, partial_data;
+
+    int exist = 0;
+    char *link_id, *val_after, *new_xml;
+    string s;
+    
+    if(strcmp(tagName,"attachmentFTOLinks")==0){
+        //  find tag "attachmentFTOLinks"
+        partial_data = ezxml_get(root,tagName,-1);
+        for(link = ezxml_child(partial_data, "link");link;link=link->next){
+            link_id = (char*)ezxml_attr(link, "id");
+            printf("link_id: %s\n",link_id);
+            if(strcmp(link_id,id)==0){
+                exist = 1;
+                break;
+            }
+        }
+        if(exist==1){
+            printf("val_before: %s\n",link->txt);
+            printf("val_diff: %s\n",diff);
+            
+            s = getPatch(link->txt,diff);
+            val_after = strdup(s.c_str());
+            printf("val_after: %s\n",val_after);
+            
+            ezxml_set_txt(link,val_after);
+            new_xml = ezxml_toxml(root);
+            printf("new_xml: %s\n", new_xml);
+        }
+        else{
+            link = ezxml_add_child(partial_data,"link",0);
+            ezxml_set_attr(link,"id",id);
+            ezxml_set_txt(link, diff);
+            new_xml = ezxml_toxml(root);
+            val_after = NULL;
+            printf("val_diff(full): %s\n",diff);
+            printf("new_xml: %s\n", new_xml);
+        }
+    }
+    else{
+        partial_data = ezxml_get(root,tagName,-1);
+        
+        if(partial_data==NULL) {
+            printf("FAILED >> incorrect tag\n");
+            free(old_xml);
+            ezxml_free(root);
+            return -1;
+        }
+        
+        printf("val_before: %s\n",partial_data->txt);
+        printf("val_diff: %s\n",diff);
+        
+        s = getPatch(partial_data->txt,diff);
+        val_after = strdup(s.c_str());
+        printf("val_after: %s\n",val_after);
+        
+        ezxml_set_txt(partial_data,val_after);
+        new_xml = ezxml_toxml(root);
+        printf("new_xml: %s\n", new_xml);
     }
 
-    printf("val_before: %s\n",partial_data->txt);
-    printf("val_diff: %s\n",diff);
-    
-    string s = getPatch(partial_data->txt,diff);
-    char* val_after = strdup(s.c_str());
-    printf("val_after: %s\n",val_after);
-
-    ezxml_set_txt(partial_data,val_after);
-    char* new_xml = ezxml_toxml(root);
-    printf("new_xml: %s\n", new_xml);
-    
     ObjectBinary* objB = createNewObjBinary(new_xml);
     int ret = setNewDataContent(data, objB);
 
     free(objB->data);
     free(objB);
     free(old_xml);
-    free(val_after);
+    if(val_after != NULL)
+        free(val_after);
     free(new_xml);
     ezxml_free(root);
     return ret;
 }
 
-Text getTagContentWithName(ObjectBinary* fullContent, char* tagName){
-    char* full_xml = strdup(fullContent->data);
-    ezxml_t root = ezxml_parse_str(full_xml,strlen(full_xml));
-    ezxml_t partial_data = ezxml_get(root,tagName,-1);
-    
-    if(partial_data==NULL) {
-        printf("FAILED >> incorrect tag\n");
-        free(full_xml);
-        ezxml_free(root);
-        return NULL;
-    }
-    
-    printf("val: %s\n",partial_data->txt);
-    char* result = strdup(partial_data->txt);
-    free(full_xml);
-    ezxml_free(root);
-    return result;
-}
+//Text getTagContentWithName(ObjectBinary* fullContent, char* tagName, char* id){
+//    char* full_xml = strdup(fullContent->data);
+//    ezxml_t root = ezxml_parse_str(full_xml,strlen(full_xml));
+//    ezxml_t partial_data = ezxml_get(root,tagName,-1);
+//    
+//    if(partial_data==NULL) {
+//        printf("FAILED >> incorrect tag\n");
+//        free(full_xml);
+//        ezxml_free(root);
+//        return NULL;
+//    }
+//    
+//    printf("val: %s\n",partial_data->txt);
+//    char* result = strdup(partial_data->txt);
+//    free(full_xml);
+//    ezxml_free(root);
+//    return result;
+//}
 
-Text getTagContent(ObjectBinary* fullContent, int tagNameEnum){
-    char* full_xml = strdup(fullContent->data);
-    ezxml_t root = ezxml_parse_str(full_xml,strlen(full_xml));
-    ezxml_t partial_data;
+//Text getTagContent(ObjectBinary* fullContent, int tagNameEnum, char* id){
+//    char* full_xml = strdup(fullContent->data);
+//    ezxml_t root = ezxml_parse_str(full_xml,strlen(full_xml));
+//    ezxml_t partial_data;
+//
+//    switch(tagNameEnum){
+//        case book_id:
+//            partial_data = ezxml_get(root,"book_id",-1);
+//            break;
+//        case author:
+//            partial_data = ezxml_get(root,"author",-1);
+//            break;
+//        case title:
+//            partial_data = ezxml_get(root,"title",-1);
+//            break;
+//        case genre:
+//            partial_data = ezxml_get(root,"genre",-1);
+//            break;
+//        case price:
+//            partial_data = ezxml_get(root,"price",-1);
+//            break;
+//        case publish_date:
+//            partial_data = ezxml_get(root,"publish_date",-1);
+//            break;
+//        case description:
+//            partial_data = ezxml_get(root,"description",-1);
+//            break;
+//        default:
+//            printf("FAILED >> incorrect tagNameEnum\n");
+//            free(full_xml);
+//            ezxml_free(root);
+//            return NULL;
+//            break;
+//    }
+//    
+//    if(partial_data==NULL) {
+//        printf("FAILED >> incorrect tag\n");
+//        free(full_xml);
+//        ezxml_free(root);
+//        return NULL;
+//    }
+//    
+//    printf("val: %s\n",partial_data->txt);
+//    char* result = strdup(partial_data->txt);
+//    free(full_xml);
+//    ezxml_free(root);
+//    return result;
+//}
 
-    switch(tagNameEnum){
-        case book_id:
-            partial_data = ezxml_get(root,"book_id",-1);
-            break;
-        case author:
-            partial_data = ezxml_get(root,"author",-1);
-            break;
-        case title:
-            partial_data = ezxml_get(root,"title",-1);
-            break;
-        case genre:
-            partial_data = ezxml_get(root,"genre",-1);
-            break;
-        case price:
-            partial_data = ezxml_get(root,"price",-1);
-            break;
-        case publish_date:
-            partial_data = ezxml_get(root,"publish_date",-1);
-            break;
-        case description:
-            partial_data = ezxml_get(root,"description",-1);
-            break;
-        default:
-            printf("FAILED >> incorrect tagNameEnum\n");
-            free(full_xml);
-            ezxml_free(root);
-            return NULL;
-            break;
-    }
-    
-    if(partial_data==NULL) {
-        printf("FAILED >> incorrect tag\n");
-        free(full_xml);
-        ezxml_free(root);
-        return NULL;
-    }
-    
-    printf("val: %s\n",partial_data->txt);
-    char* result = strdup(partial_data->txt);
-    free(full_xml);
-    ezxml_free(root);
-    return result;
-}
+//ReturnErr setTagContent(ObjectBinary* fullContent, Text newTagContent, char* tagName, char* id){
+//    char* full_xml = strdup(fullContent->data);
+//    ezxml_t root = ezxml_parse_str(full_xml,strlen(full_xml));
+//    
+//    ezxml_t partial_data = ezxml_get(root,tagName,-1);
+//    if(partial_data==NULL) {
+//        printf("FAILED >> incorrect tag\n");
+//        free(full_xml);
+//        ezxml_free(root);
+//        return -1;
+//    }
+//    
+//    ezxml_set_txt(partial_data,newTagContent);
+//    char* new_xml = ezxml_toxml(root);
+//    printf("new_xml: %s\n", new_xml);
+//    free(fullContent->data);
+//    fullContent->data = new_xml;
+//    fullContent->byteCount = strlen(new_xml);
+//    
+//    free(full_xml);
+//    ezxml_free(root);
+//    return fullContent->byteCount;
+//}
 
-ReturnErr setTagContent(ObjectBinary* fullContent, Text newTagContent, char* tagName){
-    char* full_xml = strdup(fullContent->data);
-    ezxml_t root = ezxml_parse_str(full_xml,strlen(full_xml));
-    
-    ezxml_t partial_data = ezxml_get(root,tagName,-1);
-    if(partial_data==NULL) {
-        printf("FAILED >> incorrect tag\n");
-        free(full_xml);
-        ezxml_free(root);
-        return -1;
-    }
-    
-    ezxml_set_txt(partial_data,newTagContent);
-    char* new_xml = ezxml_toxml(root);
-    printf("new_xml: %s\n", new_xml);
-    free(fullContent->data);
-    fullContent->data = new_xml;
-    fullContent->byteCount = strlen(new_xml);
-    
-    free(full_xml);
-    ezxml_free(root);
-    return fullContent->byteCount;
-}
+//const char* createData(Text dataName, Schema* dataSchema, int dType){
+//    //  schema isn't used
+//    const char* uuidstr = stringUUID();
+//    printf("uuid: %s\n",uuidstr);
+//    int ret;
+//    char sql[MAX_SQL_SIZE];
+//    
+//    //  Data
+//    printf("--------------------------------------------------[create_vertex_Data]\n");
+//    sprintf(sql,"CREATE VERTEX Data set dataID='%s', dataType='%d'",uuidstr,dType);
+////    printf("SQL: %s\n",sql);
+//    ret = createVertex(sql);
+//    if (ret!=0){
+//        printf("createData..FAILED(vertex_Data)\n");
+//        free((char*)uuidstr);
+//        return NULL;
+//    }
+//    
+//    short cltid_d, cltid_dh, cltid_dc0, cltid_dc1;
+//    long rid_d, rid_dh, rid_dc0, rid_dc1;
+//    cltid_d = addr.cltid;
+//    rid_d = addr.rid;
+//    
+//    //  DataHolder
+//    printf("--------------------------------------------------[create_vertex_DataHolder]\n");
+//    sprintf(sql,"CREATE VERTEX DataHolder set versionKeeped=%d",VER_KEEPED);
+//    ret = createVertex(sql);
+//    if (ret!=0){
+//        printf("createData..FAILED(vertex_DataHolder)\n");
+//        free((char*)uuidstr);
+//        return NULL;
+//    }
+//    
+//    cltid_dh = addr.cltid;
+//    rid_dh = addr.rid;
+//    
+//    //  toDataHolder
+//    printf("--------------------------------------------------[create_edge_toDataHolder]\n");
+//    sprintf(sql,"CREATE EDGE toDataHolder from #%d:%lu to #%d:%lu",cltid_d,rid_d,cltid_dh,rid_dh);
+//    ret = sendCommand(sql);
+//    if (ret!=0){
+//        printf("createData..FAILED(edge_toDataHolder)\n");
+//        free((char*)uuidstr);
+//        return NULL;
+//    }
+//    
+//    //  DataContent[0]
+//    char init[] ="<root></root>";
+//    printf("--------------------------------------------------[create_vertex_DataContent]\n");
+//    sprintf(sql,"CREATE VERTEX Datacontent set isDiff=%d, full_schemaCode=%d, full_byteCount=%d, full_data='%s'",FALSE,0,strlen(init),init);
+////    printf("SQL: %s\n",sql);
+//    ret = createVertex(sql);
+//    if (ret!=0){
+//        printf("createData..FAILED(vertex_DataContent[0])\n");
+//        free((char*)uuidstr);
+//        return NULL;
+//    }
+//    
+//    cltid_dc0 = addr.cltid;
+//    rid_dc0 = addr.rid;
+//    
+//    //  dc1
+//    printf("--------------------------------------------------[create_vertex_DataContent]\n");
+//    sprintf(sql,"CREATE VERTEX Datacontent set isDiff=%d, plus_schemaCode=%d, plus_byteCount=%d, plus_data='%s', full_schemaCode=%d, full_byteCount=%d, full_data='%s'",FALSE,0,_,_,0,_,_);
+////    printf("SQL: %s\n",sql);
+//    ret = createVertex(sql);
+//    if (ret!=0){
+//        printf("createData..FAILED(vertex_DataContent[1])\n");
+//        free((char*)uuidstr);
+//        return NULL;
+//    }
+//    
+//    cltid_dc1 = addr.cltid;
+//    rid_dc1 = addr.rid;
+//    
+//    return uuidstr;
+//}
 
 string getDiff(char* old_str, char* new_str){
     diff_match_patch<wstring> dmp;
@@ -1352,36 +1568,96 @@ string getPatch(char* str, char* str_patch){
     return s.assign(strResult.begin(),strResult.end());
 }
 
-void testDiffPatchXML(){
+void test_setNewData(){
     const char* uuid_data;
-    uuid_data = createNewData(_user);
+    Data* _mydata;
+    uuid_data = _createNewData(&_mydata, _user);
     
-    printf("uuid: %s\n",mydata->dataID);
-    printf("dataType: %d\n",mydata->dataType);
-    printf("ver_keeped: %d\n\n",mydata->content->versionKeeped);
+    printf("uuid: %s\n",_mydata->dataID);
+    printf("dataType: %d\n",_mydata->dataType);
+    printf("ver_keeped: %d\n\n",_mydata->content->versionKeeped);
     
-    ezxml_t root = ezxml_parse_file("/Users/pimpat/Desktop/datamodel_xml/file_xml/root.xml");
-    char* root_xml = ezxml_toxml(root);
+    char content0[] = "<root><attachmentFTOLinks></attachmentFTOLinks><book_id>bk100</book_id><author>Gambardella, Matthew</author><title>XML Developer's Guide</title><genre>Computer</genre><price>44.95</price></root>";
+    char content1[] = "<root><attachmentFTOLinks></attachmentFTOLinks><book_id>bk100</book_id><author>Pim</author><title>XML Developer's Guide</title><genre>Computer</genre><price>44.95</price></root>";
+    char content2[] = "<root><attachmentFTOLinks><link id='1'>www.xyz.com</link><link id='2'>www.123.com</link></attachmentFTOLinks><book_id>bk100</book_id><author>Pim</author><title>XML Developer's Guide</title><genre>Computer</genre><price>44.95</price></root>";
     
-    ezxml_t book0 = ezxml_parse_file("/Users/pimpat/Desktop/datamodel_xml/file_xml/book0.xml");
-    char* book0_xml = ezxml_toxml(book0);
+    ObjectBinary* obj0 = createNewObjBinary(content0);
+    ObjectBinary* obj1 = createNewObjBinary(content1);
+    ObjectBinary* obj2 = createNewObjBinary(content2);
     
-    ezxml_t book1 = ezxml_parse_file("/Users/pimpat/Desktop/datamodel_xml/file_xml/book1.xml");
-    char* book1_xml = ezxml_toxml(book1);
+    setNewDataContent(_mydata,obj0);
+    setNewDataContent(_mydata,obj1);
+//    printf("\n\n\n\n--- test_getData --\n");
+//    _mydata->content->current = _mydata->content->lastestCommon;
+//    test_getData(&_mydata);
+    setNewDataContent(_mydata,obj2);
     
-//    char* content0 = "<root><book_id>bk100</book_id><author>Gambardella, Matthew</author><title>XML Developer's Guide</title><genre>Computer</genre><price>44.95</price></root>";
-//    char* content1 = "<root><book_id>bk100</book_id><author>Pim</author><title>XML Developer's Guide</title><genre>Computer</genre><price>44.95</price></root>";
-
-    ObjectBinary* obj0 = createNewObjBinary(book0_xml);
-    ObjectBinary* obj1 = createNewObjBinary(book1_xml);
+    string diff = getDiff("www.xyz.com", "www.abc.com");
+    char* res_diff = strdup(diff.c_str());
+    printf("res_diff: %s\n\n",res_diff);
     
-    setNewDataContent(mydata,obj0);
-
+    setNewDataDiffWithTag(_mydata, "attachmentFTOLinks", "1", res_diff);
+    setNewDataDiffWithTag(_mydata, "attachmentFTOLinks", "3", "www.qaz.com");
+    
     string s = getDiff("44.95", "1000");
     char* diff_price = strdup(s.c_str());
     
-    setNewDataDiffWithTag(mydata, "price", diff_price);
-    setNewDataContent(mydata,obj1);
+    setNewDataDiffWithTag(_mydata, "price", NULL, diff_price);
+    setNewDataDiffWithTag(_mydata, "titel", NULL, "hello");
+    
+    setDataName(_mydata, "test_data");
+    printf("dataName: %s\n",_mydata->dataName);
+    setChatRoom(_mydata, "chat-room");
+    printf("chatRoom: %s\n",_mydata->chatRoom);
+
+    free(obj0->data);
+    free(obj0);
+    free(obj1->data);
+    free(obj1);
+    free(obj2->data);
+    free(obj2);
+    
+    free(res_diff);
+    free(diff_price);
+    
+    printf("\n\n\n\n--- test_getData --\n");
+//    _mydata->content->current = _mydata->content->lastestCommon;
+    test_getData(&_mydata);
+    
+    /* free Data */
+    int i=0;
+    DataContent *mydc, *next_mydc;
+    for(mydc=_mydata->content->lastestCommon;mydc!=NULL;mydc=next_mydc){
+        printf("-- %d --\n",i);
+        next_mydc = mydc->nextVersion;
+        if(mydc->SHA256hashCode != NULL)
+            free(mydc->SHA256hashCode);
+        if(mydc->timeStamp != NULL)
+            free(mydc->timeStamp->timeStampCode);
+        if(mydc->minusPatch != NULL){
+            free(mydc->minusPatch->data);
+            free(mydc->minusPatch);
+        }
+        if(mydc->plusPatch != NULL){
+            free(mydc->plusPatch->data);
+            free(mydc->plusPatch);
+        }
+        if(mydc->fullContent != NULL){
+            free(mydc->fullContent->data);
+            free(mydc->fullContent);
+        }
+        free(mydc);
+        i++;
+    }
+    free(_mydata->content);
+    free((char*)_mydata->dataID);
+    free(_mydata->dataName);
+    free(_mydata->chatRoom);
+    free(_mydata);
+}
+
+void test_getData(Data** data){
+    Data* dt = *data;
 
 //  setTagContent -------------------------------------------------------
 //    int count_bytes = setTagContent(obj0,"1234567","price");
@@ -1400,33 +1676,47 @@ void testDiffPatchXML(){
 //-----------------------------------------------------------------------
     
 //  getDataContentWithTag -----------------------------------------------
-//    char* val = getDataContentWithTag(mydata, "author");
+//    char* val = getDataContentWithTag(dt, "attachmentFTOLinks", "2");
 //    printf("val: %s\n",val);
 //    free(val);
 //-----------------------------------------------------------------------
     
 //  getDiffDataPreVer + NextVer -----------------------------------------
-//    mydata->content->current = mydata->content->lastestCommon;
-//    char* diff_pre = getDiffDataNextVer(mydata);
-//    printf("diff_pre: %s\n",diff_pre);
-//    free(diff_pre);
+//    char* diff_pre = getDiffDataPreVer(dt);
+//    if(diff_pre != NULL){
+//        printf("diff_pre: %s\n",diff_pre);
+//        free(diff_pre);
+//    }
+//    char* diff_next = getDiffDataNextVer(dt);
+//    if(diff_next != NULL){
+//        printf("diff_next: %s\n",diff_next);
+//        free(diff_next);
+//    }
 //-----------------------------------------------------------------------
     
 //  getContentPreVer + NextVer ------------------------------------------
-//    mydata->content->current = mydata->content->head->preVersion;
-//    ObjectBinary* obj_nv = getContentPreVer(mydata);
-////    ObjectBinary* obj_nv = getContentNextVer(mydata);
-//    printf("schemaCode: %d\n",obj_nv->schemaCode);
-//    printf("byteCount: %d\n",obj_nv->byteCount);
-//    printf("data: %s\n",obj_nv->data);
-//    free(obj_nv->data);
-//    free(obj_nv);
+//    ObjectBinary* obj_pv = getContentPreVer(dt);
+//    ObjectBinary* obj_nv = getContentNextVer(dt);
+//    if(obj_pv != NULL){
+//        printf("schemaCode_pv: %d\n",obj_pv->schemaCode);
+//        printf("byteCount_pv: %d\n",obj_pv->byteCount);
+//        printf("data_pv: %s\n",obj_pv->data);
+//        free(obj_pv->data);
+//        free(obj_pv);
+//    }
+//    if(obj_nv != NULL){
+//        printf("schemaCode_nv: %d\n",obj_nv->schemaCode);
+//        printf("byteCount_nv: %d\n",obj_nv->byteCount);
+//        printf("data_nv: %s\n",obj_nv->data);
+//        free(obj_nv->data);
+//        free(obj_nv);
+//    }
 //-----------------------------------------------------------------------
     
 //  getDiffDataAtHead + LastestCommon -----------------------------------
 //    printf("\n--- getDiffDataAtHead + LastestCommon ---\n");
-//    char* diff_h = getDiffDataAtHead(mydata);
-//    char* diff_l = getDiffDataAtLastestCommon(mydata);
+//    char* diff_h = getDiffDataAtHead(dt);
+//    char* diff_l = getDiffDataAtLastestCommon(dt);
 //    printf("diff_h: %s\n",diff_h);
 //    printf("diff_l: %s\n",diff_l);
 //    free(diff_h);
@@ -1434,8 +1724,8 @@ void testDiffPatchXML(){
 //-----------------------------------------------------------------------
     
 //  getDataContent + LastestCommon --------------------------------------
-//    ObjectBinary *obj_h = getDataContent(mydata);
-//    ObjectBinary *obj_l = getDataContentLastestCommon(mydata);
+//    ObjectBinary *obj_h = getDataContent(dt);
+//    ObjectBinary *obj_l = getDataContentLastestCommon(dt);
 //    printf("\n--- getDataContent ---\n");
 //    printf("schemaCode: %d\n",obj_h->schemaCode);
 //    printf("byteCount: %d\n",obj_h->byteCount);
@@ -1450,67 +1740,11 @@ void testDiffPatchXML(){
 //    free(obj_h);
 //    free(obj_l);
 //-----------------------------------------------------------------------
-    
-//  getDiff + getPatch --------------------------------------------------
-//    printf("\n---Test Diff-Patch ---\n");
-//    char* temp_xml = "<root>1234</root>";
-//    printf("init0: %s\n",root_xml);
-//    printf("diff0: %s\n\n",temp_xml);
-//    
-//    string diff = getDiff(root_xml, temp_xml);
-//    char* res_diff = strdup(diff.c_str());
-//    printf("res_diff: %s\n\n",res_diff);
-//    
-//    string patch = getPatch(root_xml, res_diff);
-//    char* res_patch = strdup(patch.c_str());
-//    printf("res_patch: %s\n\n",res_patch);
-//-----------------------------------------------------------------------
-    
-    /* free Data */
-    int i=0;
-    DataContent *mydc, *next_mydc;
-    for(mydc=mydata->content->lastestCommon->preVersion;mydc!=NULL;mydc=next_mydc){
-        printf("-- %d --\n",i);
-        next_mydc = mydc->nextVersion;
-        if(mydc->SHA256hashCode != NULL)
-            free(mydc->SHA256hashCode);
-        if(mydc->timeStamp != NULL)
-            free(mydc->timeStamp->timeStampCode);
-        
-        if(mydc->minusPatch != NULL){
-            free(mydc->minusPatch->data);
-            free(mydc->minusPatch);
-        }
-        if(mydc->plusPatch != NULL){
-            free(mydc->plusPatch->data);
-            free(mydc->plusPatch);
-        }
-        if(mydc->fullContent != NULL){
-//            printf("%d|not null\n",i);
-//            printf("%s\n",mydc->fullContent->data);
-            free(mydc->fullContent->data);
-            free(mydc->fullContent);
-        }
-        free(mydc);
-        i++;
-    }
-    free(mydata->content);
-    free((char*)mydata->dataID);
-    
-    free(obj0->data);
-    free(obj0);
-    free(obj1->data);
-    free(obj1);
-    
-    free(diff_price);
-    free(root_xml);
-    free(book0_xml);
-    free(book1_xml);
-    ezxml_free(root);
-    ezxml_free(book0);
-    ezxml_free(book1);
 
 }
 
-
+void testCRUD(){
+    char xml_schema[] = "<root><dataID></dataID><dataName></dataName><dataType></dataType><attachmentFTOLinks><link></link></attachmentFTOLinks><chatRoom></chatRoom></root>";
+    
+}
 
