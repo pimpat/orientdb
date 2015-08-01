@@ -24,10 +24,10 @@
 #define SERVER_PORT 2424
 
 #define DB_NAME "datamodel_xml"
-#define MAX_SQL_SIZE (2000)
+#define MAX_SQL_SIZE (10000)
 #define MAX_DIFF_SIZE (1000)
 #define MAX_CONTENT_SIZE (1000)
-#define VER_KEEPED (10)
+#define VER_KEEPED (5)
 
 #define TRUE 1
 #define FALSE 0
@@ -119,6 +119,14 @@ enum DATATYPE {
     _org
 };
 
+enum EDGETYPE {
+    _toUser,
+    _toCategory,
+    _toState,
+    _toTask,
+    _toSubTask,
+};
+
 enum TAGNAME {
     _attachmentFTOLinks,
     _content,
@@ -155,13 +163,13 @@ ObjectBinary* createNewObjBinary(char* data);
 int countDataContent(Data* data);
 
 void setDataName(Data* data, char* dataName);
-char* getDataName(Data* data);
 void setChatRoom(Data* data, char* chatRoom);
+char* getDataName(Data* data);
 char* getChatRoom(Data* data);
 
 //ReturnErr setDataNameByID(char* dataID, char* dataName);
-//char* getDataNameByID(char* dataID);
 //ReturnErr setChatRoomByID(char* dataID, char* chatRoom);
+//char* getDataNameByID(char* dataID);
 //char* getChatRoomByID(char* dataID);
 
 ObjectBinary* getDataContent(Data* data);
@@ -206,35 +214,45 @@ const char* createData(Text dataName, Schema* dataSchema, int dType);
 
 //Text getDataContentForKey(Schema* schema, uuid_t objID, char* keyName);
 
-//ReturnErr addData2Category(char* categoryID, Data* data);
-//ReturnErr addTask2Category(char* categoryID, Task *task);
+ReturnErr addUser2OrgByID(char* orgID, char* userID);
+ReturnErr addCategory2UserByID(char* userID, char* categoryID);
+ReturnErr addState2CategoryByID(char* categoryID, char* stateID);
+ReturnErr addTask2StateByID(char* stateID, char* taskID);
+ReturnErr addTask2CategoryByID(char* categoryID, char* taskID);
+ReturnErr addSubTask2TaskByID(char* taskID, char* subTaskID);
+ReturnErr addData2DataByID(char* f_dataID, char* t_dataID, int dType);
+
+//ReturnErr addUser2Org(char* orgID, User* user);
+//ReturnErr addCategory2User(char* userID, Category* category);
+//ReturnErr addState2Category(char* categoryID, State* state);
+//ReturnErr addTask2State(char* stateID, Task* task);
+//ReturnErr addTask2Category(char* categoryID, Task* task);
 //ReturnErr addSubTask2Task(char* taskID, SubTask *subTask);
-//ReturnErr addState2Category(char* categoryID, State *state);
-//ReturnErr addCategory2User(char* userID, char* categoryID);
-//ReturnErr addUser2Org(char* orgID, char* userID);
-////  addTaskToState ???
-//
-//ReturnErr removeDataFromCategory(char* categoryID, char* dataID);
+
+ReturnErr addData2Data(char* dataID, Data* data, int dType);
+
+//ReturnErr removeUserFromOrg(char* orgID, char* userID);
+//ReturnErr removeCategoryFromUser(char* userID, char* categoryID);
+//ReturnErr removeStateFromCategory(char* categoryID, char* stateID);
+//ReturnErr removeTaskFromState(char* stateID, char* taskID);
 //ReturnErr removeTaskFromCategory(char* categoryID, char* taskID);
 //ReturnErr removeSubTaskFromTask(char* taskID, char* subTaskID);
-//ReturnErr removeStateFromCategory(char* categoryID, char* stateID);
-//ReturnErr removeCategoryFromUser(char* userID, char* categoryID);
-//ReturnErr removeUserFromOrg(char* orgID, char* userID);
-////  removeTaskFromState ???
 //
+//ReturnErr removeDataFromData(char* f_dataID, char* t_dataID);
+
 //Data* queryDataByID(char* dataID);
 //State** queryAllStatesFromData(char* dataID);
 //Category** queryAllCategoriesFromData(char* dataID);
 //User** queryAllUsersFromData(char* dataID);
-////  queryOrg/Task/SubTask ???
 //
+//  queryOrg/Task/SubTask ???
+
 //t_bool isObjectUnderState(char* stateID, char* objID);
 //t_bool isObjectUnderCategory(char* categoryID, char* objID);
 //t_bool isObjectOwnedByUser(char* userID, char* objID);
-//
+
 //ReturnErr deleteObj(char* userID, char* objID);
 //ReturnErr flushTrash(char* userID);
-////  delete flag / delete edge
 
 /* diff-patch function */
 string getDiff(char* old_str, char* new_str);
@@ -244,18 +262,8 @@ void test_setNewData();
 void test_getData(Data** data);
 void testCRUD(Data** data);
 
-void setVal(int* num);
-void setVal(int* num){
-    *num = 8;
-}
-
 int main() {
     test_setNewData();
-    
-//    int x =6;
-//    setVal(&x);
-//    printf("%d\n",x);
-    
     return 0;
 }
 
@@ -1729,6 +1737,274 @@ const char* createData(Text dataName, Schema* dataSchema, int dType){
     return uuidstr;
 }
 
+ReturnErr addUser2OrgByID(char* orgID, char* userID){
+    int ret = addData2DataByID(orgID, userID, _toUser);
+    return ret;
+}
+
+ReturnErr addCategory2UserByID(char* userID, char* categoryID){
+    int ret = addData2DataByID(userID, categoryID, _toCategory);
+    return ret;
+}
+
+ReturnErr addState2CategoryByID(char* categoryID, char* stateID){
+    int ret = addData2DataByID(categoryID, stateID, _toState);
+    return ret;
+}
+
+ReturnErr addTask2StateByID(char* stateID, char* taskID){
+    int ret = addData2DataByID(stateID, taskID, _toTask);
+    return ret;
+}
+
+ReturnErr addTask2CategoryByID(char* categoryID, char* taskID){
+    int ret = addData2DataByID(categoryID, taskID, _toTask);
+    return ret;
+}
+
+ReturnErr addSubTask2TaskByID(char* taskID, char* subTaskID){
+    int ret = addData2DataByID(taskID, subTaskID, _toSubTask);
+    return ret;
+}
+
+ReturnErr addData2DataByID(char* f_dataID, char* t_dataID, int dType){
+    int ret;
+    char sql[MAX_SQL_SIZE];
+    
+    switch(dType){
+        case _toUser:
+            printf("--------------------------------------------------[create_edge_toUser]\n");
+            sprintf(sql,"create edge toUser from (select from Data where dataID='%s') to (select from Data where dataID='%s')",f_dataID,t_dataID);
+            break;
+        case _toCategory:
+            printf("--------------------------------------------------[create_edge_toCategory]\n");
+            sprintf(sql,"create edge toCategory from (select from Data where dataID='%s') to (select from Data where dataID='%s')",f_dataID,t_dataID);
+            break;
+        case _toState:
+            printf("--------------------------------------------------[create_edge_toState]\n");
+            sprintf(sql,"create edge toState from (select from Data where dataID='%s') to (select from Data where dataID='%s')",f_dataID,t_dataID);
+            break;
+        case _toTask:
+            printf("--------------------------------------------------[create_edge_toTask]\n");
+            sprintf(sql,"create edge toTask from (select from Data where dataID='%s') to (select from Data where dataID='%s')",f_dataID,t_dataID);
+            break;
+        case _toSubTask:
+            printf("--------------------------------------------------[create_edge_toSubTask]\n");
+            sprintf(sql,"create edge toSubTask from (select from Data where dataID='%s') to (select from Data where dataID='%s')",f_dataID,t_dataID);
+            break;
+        default:
+            return -1;
+            break;
+    }
+    
+    ret = sendCommand(sql);
+    if (ret!=0){
+        printf("addData2DataByID..FAILED\n");
+        return -1;
+    }
+    
+    return 0;
+}
+
+//ReturnErr addUser2Org(char* orgID, User* user);
+//ReturnErr addCategory2User(char* userID, Category* category);
+//ReturnErr addState2Category(char* categoryID, State* state);
+//ReturnErr addTask2State(char* stateID, Task* task);
+//ReturnErr addTask2Category(char* categoryID, Task* task);
+//ReturnErr addSubTask2Task(char* taskID, SubTask *subTask);
+
+ReturnErr addData2Data(char* dataID, Data* data, int dType){
+    int ret;
+    char sql[MAX_SQL_SIZE];
+    
+    short dt_cltid, dh_cltid, dl_cltid;
+    long dt_rid, dh_rid, dl_rid;
+    
+    //  Data
+    printf("--------------------------------------------------[create_vertex_Data]\n");
+    sprintf(sql,"CREATE VERTEX Data set dataID='%s', dataType=%d, dataName='%s', chatRoom='%s'",data->dataID,data->dataType,data->dataName,data->chatRoom);
+    ret = createVertex(sql,&dt_cltid,&dt_rid);
+    if (ret!=0){
+        printf("addData2Data..FAILED(vertex_Data)\n");
+        return -1;
+    }
+    
+    //  DataHolder
+    printf("--------------------------------------------------[create_vertex_DataHolder]\n");
+    sprintf(sql,"CREATE VERTEX DataHolder set versionKeeped=%d",data->content->versionKeeped);
+    ret = createVertex(sql,&dh_cltid,&dh_rid);
+    if (ret!=0){
+        printf("addData2Data..FAILED(vertex_DataHolder)\n");
+        return -1;
+    }
+    
+    //  toDataHolder
+    printf("--------------------------------------------------[create_edge_toDataHolder]\n");
+    sprintf(sql,"CREATE EDGE toDataHolder from #%d:%lu to #%d:%lu",dt_cltid,dt_rid,dh_cltid,dh_rid);
+    ret = sendCommand(sql);
+    if (ret!=0){
+        printf("addData2Data..FAILED(edge_toDataHolder)\n");
+        return -1;
+    }
+    
+    //  Delete (for User only)
+    if(dType==_toUser){
+        printf("--------------------------------------------------[create_vertex_Delete]\n");
+        sprintf(sql,"CREATE VERTEX Delete set userID='%s'",data->dataID);
+        ret = createVertex(sql,&dl_cltid,&dl_rid);
+        if (ret!=0){
+            printf("addData2Data..FAILED(vertex_Delete)\n");
+            return -1;
+        }
+        
+        //  toDelete
+        printf("--------------------------------------------------[create_edge_toDelete]\n");
+        sprintf(sql,"CREATE EDGE toDelete from #%d:%lu to #%d:%lu",dt_cltid,dt_rid,dl_cltid,dl_rid);
+        ret = sendCommand(sql);
+        if (ret!=0){
+            printf("addData2Data..FAILED(edge_toDelete)\n");
+            return -1;
+        }
+    }
+    
+    //  DataContent
+    int count = countDataContent(data);
+    count--;
+    short dc_cltid[count];
+    long dc_rid[count];
+//    printf("count: %d\n",count);
+    int i=0;
+    DataContent *dc, *next_dc;
+    for(dc=data->content->lastestCommon;dc!=NULL;dc=next_dc){
+        printf("--------------------------------------------------[create_vertex_DataContent #%d]\n",i);
+        if(dc->fullContent != NULL && dc->minusPatch == NULL && dc->plusPatch == NULL){
+            printf("case1\n");
+            sprintf(sql,"CREATE VERTEX Datacontent set isDiff=%d, full_schemaCode=%d, full_byteCount=%d, full_data='%s'",dc->isDiff,dc->fullContent->schemaCode,dc->fullContent->byteCount,dc->fullContent->data);
+        }
+        else if(dc->plusPatch != NULL && dc->minusPatch != NULL && dc->fullContent == NULL){
+            printf("case2\n");
+            sprintf(sql,"CREATE VERTEX Datacontent set isDiff=%d, plus_schemaCode=%d, plus_byteCount=%d, plus_data='%s', minus_schemaCode=%d, minus_byteCount=%d, minus_data='%s'",dc->isDiff,dc->plusPatch->schemaCode,dc->plusPatch->byteCount,dc->plusPatch->data,dc->minusPatch->schemaCode,dc->minusPatch->byteCount,dc->minusPatch->data);
+        }
+        else if(dc->plusPatch != NULL && dc->fullContent != NULL && dc->minusPatch == NULL){
+            // bug
+            printf("case3\n");
+            sprintf(sql,"CREATE VERTEX Datacontent set isDiff=%d, plus_schemaCode=%d, plus_byteCount=%d, plus_data='%s', full_schemaCode=%d, full_byteCount=%d, full_data='%s'",dc->isDiff,dc->plusPatch->schemaCode,dc->plusPatch->byteCount,dc->plusPatch->data,dc->fullContent->schemaCode,dc->fullContent->byteCount,dc->fullContent->data);
+            //"111111111");
+            //dc->fullContent->data);
+//            printf("SQL: %s\n",sql);
+        }
+        else{
+            //  minusPatch
+            printf("case4\n");
+            sprintf(sql,"CREATE VERTEX Datacontent set isDiff=%d, minus_schemaCode=%d, minus_byteCount=%d, minus_data='%s'",dc->isDiff,dc->minusPatch->schemaCode,dc->minusPatch->byteCount,dc->minusPatch->data);
+        }
+        printf("SQL: %s\n",sql);
+        ret = createVertex(sql,&dc_cltid[i],&dc_rid[i]);
+        if (ret!=0){
+            printf("addData2Data..FAILED(vertex_DataContent)\n");
+            return -1;
+        }
+        printf("@rid #%d:%lu\n",dc_cltid[i],dc_rid[i]);
+        next_dc = dc->nextVersion;
+        i++;
+    }
+    
+    int head = count-1;
+    
+    //  head/lastestCommon/current
+    printf("--------------------------------------------------[create_edge_toDataContent_head]\n");
+    sprintf(sql,"CREATE EDGE toDataContent from #%d:%lu to #%d:%lu set type='head'",dh_cltid,dh_rid,dc_cltid[count-1],dc_rid[count-1]);
+//    printf("SQL: %s\n",sql);
+    ret = sendCommand(sql);
+    if (ret!=0){
+        printf("addData2Data..FAILED(edge_toDataContent_head)\n");
+        return -1;
+    }
+
+    printf("--------------------------------------------------[create_edge_toDataContent_current]\n");
+    sprintf(sql,"CREATE EDGE toDataContent from #%d:%lu to #%d:%lu set type='current'",dh_cltid,dh_rid,dc_cltid[count-1],dc_rid[count-1]);
+    ret = sendCommand(sql);
+    if (ret!=0){
+        printf("addData2Data..FAILED(edge_toDataContent_current)\n");
+        return -1;
+    }
+
+    printf("--------------------------------------------------[create_edge_toDataContent_lastestCommon]\n");
+    sprintf(sql,"CREATE EDGE toDataContent from #%d:%lu to #%d:%lu set type='lastestCommon'",dh_cltid,dh_rid,dc_cltid[0],dc_rid[0]);
+    ret = sendCommand(sql);
+    if (ret!=0){
+        printf("addData2Data..FAILED(edge_toDataContent_lastestCommon)\n");
+        return -1;
+    }
+    
+    //  next/pre/toDataHolder_fromDC
+    for(i=0;i<count;i++){
+        printf("--------------------------------------------------[create_edge_toDataHolder_fromDC #%d]\n",i);
+        sprintf(sql,"CREATE EDGE toDataHolder_fromDC from #%d:%lu to #%d:%lu",dc_cltid[i],dc_rid[i],dh_cltid,dh_rid);
+        ret = sendCommand(sql);
+        if (ret!=0){
+            printf("addData2Data..FAILED(edge_toDataHolder_fromDC)\n");
+            return -1;
+        }
+        
+        // pre
+        if(i != 0){
+            printf("--------------------------------------------------[create_edge_toContent_Pre]\n");
+            sprintf(sql,"CREATE EDGE toContent from #%d:%lu to #%d:%lu set type='pre'",dc_cltid[i],dc_rid[i],dc_cltid[i-1],dc_rid[i-1]);
+            ret = sendCommand(sql);
+            if (ret!=0){
+                printf("addData2Data..FAILED(edge_toContent_Pre)\n");
+                return -1;
+            }
+        }
+        // next
+        if(i != count-1){
+            printf("--------------------------------------------------[create_edge_toContent_Next]\n");
+            sprintf(sql,"CREATE EDGE toContent from #%d:%lu to #%d:%lu set type='next'",dc_cltid[i],dc_rid[i],dc_cltid[i+1],dc_rid[i+1]);
+            ret = sendCommand(sql);
+            if (ret!=0){
+                printf("addData2Data..FAILED(edge_toContent_Next)\n");
+                return -1;
+            }
+        }
+    }
+    
+    // create Edge from Data to Data
+    switch(dType){
+        case _toUser:
+            printf("--------------------------------------------------[create_edge_toUser]\n");
+            sprintf(sql,"create edge toUser from (select from Data where dataID='%s') to #%d:%lu",dataID,dt_cltid,dt_rid);
+            break;
+        case _toCategory:
+            printf("--------------------------------------------------[create_edge_toCategory]\n");
+            sprintf(sql,"create edge toCategory from (select from Data where dataID='%s') to #%d:%lu",dataID,dt_cltid,dt_rid);
+            break;
+        case _toState:
+            printf("--------------------------------------------------[create_edge_toState]\n");
+            sprintf(sql,"create edge toState from (select from Data where dataID='%s') to #%d:%lu",dataID,dt_cltid,dt_rid);
+            break;
+        case _toTask:
+            printf("--------------------------------------------------[create_edge_toTask]\n");
+            sprintf(sql,"create edge toTask from (select from Data where dataID='%s') to #%d:%lu",dataID,dt_cltid,dt_rid);
+            break;
+        case _toSubTask:
+            printf("--------------------------------------------------[create_edge_toSubTask]\n");
+            sprintf(sql,"create edge toSubTask from (select from Data where dataID='%s') to #%d:%lu",dataID,dt_cltid,dt_rid);
+            break;
+        default:
+            return -1;
+            break;
+    }
+//    printf("SQL: %s\n",sql);
+    ret = sendCommand(sql);
+    if (ret!=0){
+        printf("addData2Data..FAILED(edge_toData)\n");
+        return -1;
+    }
+    
+    return 0;
+}
+
 string getDiff(char* old_str, char* new_str){
     diff_match_patch<wstring> dmp;
     string s;
@@ -1757,7 +2033,7 @@ string getPatch(char* str, char* str_patch){
 void test_setNewData(){
     const char* uuid_data;
     Data* _mydata;
-    uuid_data = _createNewData(&_mydata, _user);
+    uuid_data = _createNewData(&_mydata, _category);
     
     printf("uuid: %s\n",_mydata->dataID);
     printf("dataType: %d\n",_mydata->dataType);
@@ -1791,7 +2067,7 @@ void test_setNewData(){
     setNewDataDiffWithTag(_mydata, "price", NULL, diff_price);
     setNewDataDiffWithTag(_mydata, "titel", NULL, "hello");
     
-    setDataName(_mydata, "test_data");
+    setDataName(_mydata, "test-Category");
     printf("dataName: %s\n",_mydata->dataName);
     setChatRoom(_mydata, "chat-room");
     printf("chatRoom: %s\n",_mydata->chatRoom);
@@ -1955,6 +2231,7 @@ void testCRUD(Data** data){
     int ret;
     Sockfd = connectSocket();
     if (Sockfd < 0){
+        printf ("error connectSocket\n");
 //        return Sockfd;
     }
     
@@ -1971,12 +2248,16 @@ void testCRUD(Data** data){
 //    printf("@rid #%d:%lu\n",_cltid,_rid);
     
     Schema test_schema[]="<root><attachmentFTOLinks></attachmentFTOLinks><book_id></book_id><author></author><title></title><genre></genre><price></price></root>";
-    createUser("Tanapon", test_schema);
+    
+//    createUser("Tanapoom", test_schema);
+//    createCategory("Doc", test_schema);
+//    addData2DataByID("64E0D9327B70470AB00CB4B85289819F", "5D93E6C8F185442E890943AAEC0969EC", _toCategory);
+    
+    Data* dt = *data;
+    addData2Data("5C53EE6A663F42CBB2B89EBC72A83974",dt,_toCategory);
     
     disconnectServer();
     close(Sockfd);
-    
-    Data* dt = *data;
-    
+ 
 }
 
