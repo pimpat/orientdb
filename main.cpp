@@ -42,11 +42,11 @@ typedef struct Packet {
 } Packet;
 Packet GPacket;
 
-typedef struct Addr{
-    short cltid;
-    long rid;
-} Addr;
-Addr addr;
+//typedef struct Addr{
+//    short cltid;
+//    long rid;
+//} Addr;
+//Addr addr;
 
 //----------------------------------
 
@@ -59,7 +59,7 @@ typedef struct CWTimeStamp{
 } CWTimeStamp;
 
 typedef char* Text;
-typedef char* Schema;
+typedef char Schema;
 
 typedef struct ObjectBinary {
     int schemaCode;
@@ -93,8 +93,8 @@ typedef struct Data{
     char* dataName;
     int dataType;
     DataHolder* content;
-    Text* attachmentFTOLinks;   //  NULL
-    char* chatRoom;          //  NULL
+//    Text* attachmentFTOLinks;
+    char* chatRoom;
 } Data;
 
 typedef Data Org;
@@ -119,23 +119,14 @@ enum DATATYPE {
     _org
 };
 
-//enum TAGNAME {
-//    book_id,
-//    author,
-//    title,
-//    genre,
-//    price,
-//    publish_date,
-//    description
-//};
-
 enum TAGNAME {
-//    _dataID,
-//    _dataType,
-//    _dataName,
     _attachmentFTOLinks,
-    _chatRoom,
-    _content
+    _content,
+    _book_id,
+    _author,
+    _title,
+    _genre,
+    _price
 };
 
 /* binary protocol */
@@ -149,7 +140,7 @@ int openDatabase(char *dbName);
 int sendCommand(char *command);
 int queryRecord(char *query);
 int loadRecord(short clusterId, long clusterPos);
-int createVertex(char *command);
+int createVertex(char *command, short* cltid, long* rid);
 
 char* getRid(char *query);
 char* getContent(char *query);
@@ -203,16 +194,18 @@ Text getTagContentWithName(ObjectBinary* fullContent, char* tagName, char* id);
 Text getTagContent(ObjectBinary* fullContent, int tagNameEnum, char* id);
 ReturnErr setTagContent(ObjectBinary* fullContent, Text newTagContent, char* tagName, char* id);
 
-//const char* createOrg(Text orgName, Schema* orgSchema);
-//const char* createUser(Text userName, Schema* userSchema);
-//const char* createCategory(Text categoryName, Schema* categorySchema);
-//const char* createState(Text stateName, Schema* stateSchema);
-//const char* createTask(Text taskName, Schema* );
-//const char* createSubTask(Text subTaskName);
+Text* getAttachmentFTOLinks(Data* data);
+
+const char* createOrg(Text orgName, Schema* orgSchema);
+const char* createUser(Text userName, Schema* userSchema);
+const char* createCategory(Text categoryName, Schema* categorySchema);
+const char* createState(Text stateName, Schema* stateSchema);
+const char* createTask(Text taskName, Schema* taskSchema);
+const char* createSubTask(Text subTaskName, Schema* subTaskSchema);
 const char* createData(Text dataName, Schema* dataSchema, int dType);
 
 //Text getDataContentForKey(Schema* schema, uuid_t objID, char* keyName);
-//
+
 //ReturnErr addData2Category(char* categoryID, Data* data);
 //ReturnErr addTask2Category(char* categoryID, Task *task);
 //ReturnErr addSubTask2Task(char* taskID, SubTask *subTask);
@@ -249,7 +242,7 @@ string getPatch(char* str, char* str_patch);
 
 void test_setNewData();
 void test_getData(Data** data);
-void testCRUD();
+void testCRUD(Data** data);
 
 void setVal(int* num);
 void setVal(int* num){
@@ -258,15 +251,13 @@ void setVal(int* num){
 
 int main() {
     test_setNewData();
-//    testCRUD();
+    
 //    int x =6;
 //    setVal(&x);
 //    printf("%d\n",x);
     
     return 0;
 }
-
-
 
 int connectSocket() {
     int sockfd;
@@ -416,6 +407,18 @@ int prepareDB() {
     
     /* Edge toSubTask */
     ret = createClass("toSubTask","E");
+    if (ret!=0) return 1;
+    
+    /* Delete */
+    ret = createClass("Delete","V");
+    if (ret!=0) return 1;
+    
+    ret = sendCommand("CREATE PROPERTY Delete.userID STRING");
+    if (ret!=0) return 1;
+    //printf("CREATE PROPERTY Delete.userID STRING: OK!\n");
+    
+    /* Edge toDelete */
+    ret = createClass("toDelete","E");
     if (ret!=0) return 1;
     
     /* Data */
@@ -685,7 +688,7 @@ int loadRecord(short clusterId, long clusterPos) {
     return 0;
 }
 
-int createVertex(char *command){
+int createVertex(char *command, short* cltid, long* rid){
     int ret, size;
     int in_size;
     GPacket.opType = REQUEST_COMMAND;
@@ -698,14 +701,15 @@ int createVertex(char *command){
         return 1;
     }
     else{
-        ret = read(Sockfd, &addr.cltid, 2);
+        ret = read(Sockfd, &*cltid, 2);
         if (ret<0) return 1;
-        swapEndian(&addr.cltid, SHORT);
-        ret = read(Sockfd, &addr.rid, 8);
-        if (ret<0) return 1;
-        swapEndian(&addr.rid, LONG);
-        printf("@rid #%d:%lu\n",addr.cltid,addr.rid);
+        swapEndian(&*cltid, SHORT);
         
+        ret = read(Sockfd, &*rid, 8);
+        if (ret<0) return 1;
+        swapEndian(&*rid, LONG);
+        
+        printf("@rid #%d:%lu\n",*cltid,*rid);
         read(Sockfd, &in_size, 4);
         read(Sockfd, &in_size, 4);
         swapEndian(&in_size, INT);
@@ -890,7 +894,7 @@ const char* createNewData(int dataType){
     mydata->dataName = NULL;
     mydata->dataType = dataType;
     mydata->content = createNewDataHolder();
-    mydata->attachmentFTOLinks = NULL;
+//    mydata->attachmentFTOLinks = NULL;
     mydata->chatRoom = NULL;
     return mydata->dataID;
 }
@@ -903,7 +907,7 @@ const char* _createNewData(Data** data, int dataType){
     dt->dataName = NULL;
     dt->dataType = dataType;
     dt->content = createNewDataHolder();
-    dt->attachmentFTOLinks = NULL;
+//    dt->attachmentFTOLinks = NULL;
     dt->chatRoom = NULL;
     return dt->dataID;
 }
@@ -1373,175 +1377,357 @@ ReturnErr setNewDataDiffWithTag(Data* data, char* tagName, char* id, Text diff){
     return ret;
 }
 
-//Text getTagContentWithName(ObjectBinary* fullContent, char* tagName, char* id){
-//    char* full_xml = strdup(fullContent->data);
-//    ezxml_t root = ezxml_parse_str(full_xml,strlen(full_xml));
-//    ezxml_t partial_data = ezxml_get(root,tagName,-1);
-//    
-//    if(partial_data==NULL) {
-//        printf("FAILED >> incorrect tag\n");
-//        free(full_xml);
-//        ezxml_free(root);
-//        return NULL;
-//    }
-//    
-//    printf("val: %s\n",partial_data->txt);
-//    char* result = strdup(partial_data->txt);
-//    free(full_xml);
-//    ezxml_free(root);
-//    return result;
-//}
+Text getTagContentWithName(ObjectBinary* fullContent, char* tagName, char* id){
+    char* full_xml = strdup(fullContent->data);
+    ezxml_t root = ezxml_parse_str(full_xml,strlen(full_xml));
+    ezxml_t partial_data = ezxml_get(root,tagName,-1);
+    
+    if(partial_data==NULL) {
+        printf("FAILED >> incorrect tag\n");
+        free(full_xml);
+        ezxml_free(root);
+        return NULL;
+    }
+    
+    ezxml_t link;
+    char* link_id;
+    int exist = 0;
+    
+    if(strcmp(tagName,"attachmentFTOLinks")==0){
+        for(link = ezxml_child(partial_data, "link");link;link=link->next){
+            link_id = (char*)ezxml_attr(link, "id");
+            printf("link_id: %s\n",link_id);
+            if(strcmp(link_id,id)==0){
+                exist=1;
+                break;
+            }
+        }
+        if(exist==1){
+            partial_data = link;
+        }
+        else{
+            printf("FAILED >> incorrect id\n");
+            free(full_xml);
+            ezxml_free(root);
+            return NULL;
+        }
+    }
+    
+    printf("val: %s\n",partial_data->txt);
+    char* result = strdup(partial_data->txt);
+    free(full_xml);
+    ezxml_free(root);
+    return result;
+}
 
-//Text getTagContent(ObjectBinary* fullContent, int tagNameEnum, char* id){
-//    char* full_xml = strdup(fullContent->data);
-//    ezxml_t root = ezxml_parse_str(full_xml,strlen(full_xml));
-//    ezxml_t partial_data;
-//
-//    switch(tagNameEnum){
-//        case book_id:
-//            partial_data = ezxml_get(root,"book_id",-1);
-//            break;
-//        case author:
-//            partial_data = ezxml_get(root,"author",-1);
-//            break;
-//        case title:
-//            partial_data = ezxml_get(root,"title",-1);
-//            break;
-//        case genre:
-//            partial_data = ezxml_get(root,"genre",-1);
-//            break;
-//        case price:
-//            partial_data = ezxml_get(root,"price",-1);
-//            break;
-//        case publish_date:
-//            partial_data = ezxml_get(root,"publish_date",-1);
-//            break;
-//        case description:
-//            partial_data = ezxml_get(root,"description",-1);
-//            break;
-//        default:
-//            printf("FAILED >> incorrect tagNameEnum\n");
-//            free(full_xml);
-//            ezxml_free(root);
-//            return NULL;
-//            break;
-//    }
-//    
-//    if(partial_data==NULL) {
-//        printf("FAILED >> incorrect tag\n");
-//        free(full_xml);
-//        ezxml_free(root);
-//        return NULL;
-//    }
-//    
-//    printf("val: %s\n",partial_data->txt);
-//    char* result = strdup(partial_data->txt);
-//    free(full_xml);
-//    ezxml_free(root);
-//    return result;
-//}
+Text getTagContent(ObjectBinary* fullContent, int tagNameEnum, char* id){
+    char* full_xml = strdup(fullContent->data);
+    ezxml_t root = ezxml_parse_str(full_xml,strlen(full_xml));
+    ezxml_t partial_data;
 
-//ReturnErr setTagContent(ObjectBinary* fullContent, Text newTagContent, char* tagName, char* id){
-//    char* full_xml = strdup(fullContent->data);
-//    ezxml_t root = ezxml_parse_str(full_xml,strlen(full_xml));
-//    
-//    ezxml_t partial_data = ezxml_get(root,tagName,-1);
-//    if(partial_data==NULL) {
-//        printf("FAILED >> incorrect tag\n");
-//        free(full_xml);
-//        ezxml_free(root);
-//        return -1;
-//    }
-//    
-//    ezxml_set_txt(partial_data,newTagContent);
-//    char* new_xml = ezxml_toxml(root);
-//    printf("new_xml: %s\n", new_xml);
-//    free(fullContent->data);
-//    fullContent->data = new_xml;
-//    fullContent->byteCount = strlen(new_xml);
-//    
-//    free(full_xml);
-//    ezxml_free(root);
-//    return fullContent->byteCount;
-//}
+    switch(tagNameEnum){
+        case _attachmentFTOLinks:
+            partial_data = ezxml_get(root,"attachmentFTOLinks",-1);
+            break;
+        case _content:
+            partial_data = ezxml_get(root,"content",-1);
+            break;
+        case _book_id:
+            partial_data = ezxml_get(root,"book_id",-1);
+            break;
+        case _author:
+            partial_data = ezxml_get(root,"author",-1);
+            break;
+        case _title:
+            partial_data = ezxml_get(root,"title",-1);
+            break;
+        case _genre:
+            partial_data = ezxml_get(root,"genre",-1);
+            break;
+        case _price:
+            partial_data = ezxml_get(root,"price",-1);
+            break;
+        default:
+            partial_data = NULL;
+            break;
+    }
+    
+    if(partial_data==NULL) {
+        printf("FAILED >> incorrect tag\n");
+        free(full_xml);
+        ezxml_free(root);
+        return NULL;
+    }
+    
+    ezxml_t link;
+    char* link_id;
+    int exist = 0;
+    
+    if(tagNameEnum==_attachmentFTOLinks){
+        for(link = ezxml_child(partial_data, "link");link;link=link->next){
+            link_id = (char*)ezxml_attr(link, "id");
+            printf("link_id: %s\n",link_id);
+            if(strcmp(link_id,id)==0){
+                exist=1;
+                break;
+            }
+        }
+        if(exist==1){
+            partial_data = link;
+        }
+        else{
+            printf("FAILED >> incorrect id\n");
+            free(full_xml);
+            ezxml_free(root);
+            return NULL;
+        }
+    }
+    
+    printf("val: %s\n",partial_data->txt);
+    char* result = strdup(partial_data->txt);
+    free(full_xml);
+    ezxml_free(root);
+    return result;
+}
 
-//const char* createData(Text dataName, Schema* dataSchema, int dType){
-//    //  schema isn't used
-//    const char* uuidstr = stringUUID();
-//    printf("uuid: %s\n",uuidstr);
-//    int ret;
-//    char sql[MAX_SQL_SIZE];
-//    
-//    //  Data
-//    printf("--------------------------------------------------[create_vertex_Data]\n");
-//    sprintf(sql,"CREATE VERTEX Data set dataID='%s', dataType='%d'",uuidstr,dType);
-////    printf("SQL: %s\n",sql);
-//    ret = createVertex(sql);
-//    if (ret!=0){
-//        printf("createData..FAILED(vertex_Data)\n");
-//        free((char*)uuidstr);
-//        return NULL;
-//    }
-//    
-//    short cltid_d, cltid_dh, cltid_dc0, cltid_dc1;
-//    long rid_d, rid_dh, rid_dc0, rid_dc1;
-//    cltid_d = addr.cltid;
-//    rid_d = addr.rid;
-//    
-//    //  DataHolder
-//    printf("--------------------------------------------------[create_vertex_DataHolder]\n");
-//    sprintf(sql,"CREATE VERTEX DataHolder set versionKeeped=%d",VER_KEEPED);
-//    ret = createVertex(sql);
-//    if (ret!=0){
-//        printf("createData..FAILED(vertex_DataHolder)\n");
-//        free((char*)uuidstr);
-//        return NULL;
-//    }
-//    
-//    cltid_dh = addr.cltid;
-//    rid_dh = addr.rid;
-//    
-//    //  toDataHolder
-//    printf("--------------------------------------------------[create_edge_toDataHolder]\n");
-//    sprintf(sql,"CREATE EDGE toDataHolder from #%d:%lu to #%d:%lu",cltid_d,rid_d,cltid_dh,rid_dh);
-//    ret = sendCommand(sql);
-//    if (ret!=0){
-//        printf("createData..FAILED(edge_toDataHolder)\n");
-//        free((char*)uuidstr);
-//        return NULL;
-//    }
-//    
-//    //  DataContent[0]
-//    char init[] ="<root></root>";
-//    printf("--------------------------------------------------[create_vertex_DataContent]\n");
-//    sprintf(sql,"CREATE VERTEX Datacontent set isDiff=%d, full_schemaCode=%d, full_byteCount=%d, full_data='%s'",FALSE,0,strlen(init),init);
-////    printf("SQL: %s\n",sql);
-//    ret = createVertex(sql);
-//    if (ret!=0){
-//        printf("createData..FAILED(vertex_DataContent[0])\n");
-//        free((char*)uuidstr);
-//        return NULL;
-//    }
-//    
-//    cltid_dc0 = addr.cltid;
-//    rid_dc0 = addr.rid;
-//    
-//    //  dc1
-//    printf("--------------------------------------------------[create_vertex_DataContent]\n");
-//    sprintf(sql,"CREATE VERTEX Datacontent set isDiff=%d, plus_schemaCode=%d, plus_byteCount=%d, plus_data='%s', full_schemaCode=%d, full_byteCount=%d, full_data='%s'",FALSE,0,_,_,0,_,_);
-////    printf("SQL: %s\n",sql);
-//    ret = createVertex(sql);
-//    if (ret!=0){
-//        printf("createData..FAILED(vertex_DataContent[1])\n");
-//        free((char*)uuidstr);
-//        return NULL;
-//    }
-//    
-//    cltid_dc1 = addr.cltid;
-//    rid_dc1 = addr.rid;
-//    
-//    return uuidstr;
-//}
+ReturnErr setTagContent(ObjectBinary* fullContent, Text newTagContent, char* tagName, char* id){
+    char* full_xml = strdup(fullContent->data);
+    ezxml_t root = ezxml_parse_str(full_xml,strlen(full_xml));
+    
+    ezxml_t link, partial_data;
+    
+    int exist = 0;
+    char *link_id, *val_after, *new_xml;
+    string s;
+    
+    if(strcmp(tagName,"attachmentFTOLinks")==0){
+        //  find tag "attachmentFTOLinks"
+        partial_data = ezxml_get(root,tagName,-1);
+        for(link = ezxml_child(partial_data, "link");link;link=link->next){
+            link_id = (char*)ezxml_attr(link, "id");
+            printf("link_id: %s\n",link_id);
+            if(strcmp(link_id,id)==0){
+                exist = 1;
+                break;
+            }
+        }
+        if(exist==1){
+            ezxml_set_txt(link,newTagContent);
+        }
+        else{
+            link = ezxml_add_child(partial_data,"link",0);
+            ezxml_set_attr(link,"id",id);
+            ezxml_set_txt(link, newTagContent);
+        }
+    }
+    else{
+        partial_data = ezxml_get(root,tagName,-1);
+        
+        if(partial_data==NULL) {
+            printf("FAILED >> incorrect tag\n");
+            free(full_xml);
+            ezxml_free(root);
+            return -1;
+        }
+        
+        ezxml_set_txt(partial_data,newTagContent);
+    }
+    new_xml = ezxml_toxml(root);
+    printf("new_xml: %s\n", new_xml);
+    
+    free(fullContent->data);
+    fullContent->data = new_xml;
+    fullContent->byteCount = strlen(new_xml);
+    
+    free(full_xml);
+    ezxml_free(root);
+    return fullContent->byteCount;
+}
+
+Text* getAttachmentFTOLinks(Data* data){
+    char* full_xml = strdup(data->content->head->fullContent->data);
+    ezxml_t root = ezxml_parse_str(full_xml,strlen(full_xml));
+    ezxml_t partial_data = ezxml_get(root,"attachmentFTOLinks",-1);
+    
+    ezxml_t link;
+    char* link_id;
+    int count = 0;
+    
+    for(link = ezxml_child(partial_data, "link");link;link=link->next){
+        link_id = (char*)ezxml_attr(link, "id");
+        printf("link_id: %s\n",link_id);
+        count++;
+    }
+    
+    if(count==0){
+        printf("not found link in TAG 'attachmentFTOLinks'\n");
+        free(full_xml);
+        ezxml_free(root);
+        return NULL;
+    }
+    
+    Text* att_link = (Text*)malloc((count+1)*sizeof(Text));
+    int i=0;
+    for(link = ezxml_child(partial_data, "link");link;link=link->next){
+//        link_id = (char*)ezxml_attr(link, "id");
+        printf("link_txt: %s\n",link->txt);
+        att_link[i] = strdup(link->txt);
+        i++;
+    }
+    att_link[i]=NULL;
+    
+    free(full_xml);
+    ezxml_free(root);
+    return att_link;
+}
+
+const char* createOrg(Text orgName, Schema* orgSchema){
+    const char* uuidstr = createData(orgName,orgSchema,_org);
+    return uuidstr;
+}
+
+const char* createUser(Text userName, Schema* userSchema){
+    const char* uuidstr = createData(userName,userSchema,_user);
+    return uuidstr;
+}
+
+const char* createCategory(Text categoryName, Schema* categorySchema){
+    const char* uuidstr = createData(categoryName,categorySchema,_category);
+    return uuidstr;
+}
+
+const char* createState(Text stateName, Schema* stateSchema){
+    const char* uuidstr = createData(stateName,stateSchema,_state);
+    return uuidstr;
+}
+
+const char* createTask(Text taskName, Schema* taskSchema){
+    const char* uuidstr = createData(taskName,taskSchema,_task);
+    return uuidstr;
+}
+
+const char* createSubTask(Text subTaskName, Schema* subTaskSchema){
+    const char* uuidstr = createData(subTaskName,subTaskSchema,_subTask);
+    return uuidstr;
+}
+
+const char* createData(Text dataName, Schema* dataSchema, int dType){
+    //  schema isn't used
+    const char* uuidstr = stringUUID();
+    printf("uuid: %s\n",uuidstr);
+    int ret;
+    char sql[MAX_SQL_SIZE];
+    
+    short dt_cltid, dh_cltid, dl_cltid, dc_cltid;
+    long dt_rid, dh_rid, dl_rid, dc_rid;
+    
+    //  Data
+    printf("--------------------------------------------------[create_vertex_Data]\n");
+    // chatRoom use setChatRoomByID
+    sprintf(sql,"CREATE VERTEX Data set dataID='%s', dataType=%d, dataName='%s'",uuidstr,dType,dataName);
+    ret = createVertex(sql,&dt_cltid,&dt_rid);
+    if (ret!=0){
+        printf("createData..FAILED(vertex_Data)\n");
+        free((char*)uuidstr);
+        return NULL;
+    }
+    
+    //  DataHolder
+    printf("--------------------------------------------------[create_vertex_DataHolder]\n");
+    sprintf(sql,"CREATE VERTEX DataHolder set versionKeeped=%d",VER_KEEPED);
+    ret = createVertex(sql,&dh_cltid,&dh_rid);
+    if (ret!=0){
+        printf("createData..FAILED(vertex_DataHolder)\n");
+        free((char*)uuidstr);
+        return NULL;
+    }
+    
+    //  toDataHolder
+    printf("--------------------------------------------------[create_edge_toDataHolder]\n");
+    sprintf(sql,"CREATE EDGE toDataHolder from #%d:%lu to #%d:%lu",dt_cltid,dt_rid,dh_cltid,dh_rid);
+    ret = sendCommand(sql);
+    if (ret!=0){
+        printf("createData..FAILED(edge_toDataHolder)\n");
+        free((char*)uuidstr);
+        return NULL;
+    }
+    
+    //  Delete (for User only)
+    if(dType==_user){
+        printf("--------------------------------------------------[create_vertex_Delete]\n");
+        sprintf(sql,"CREATE VERTEX Delete set userID='%s'",uuidstr);
+        ret = createVertex(sql,&dl_cltid,&dl_rid);
+        if (ret!=0){
+            printf("createData..FAILED(vertex_Delete)\n");
+            free((char*)uuidstr);
+            return NULL;
+        }
+        
+        //  toDelete
+        printf("--------------------------------------------------[create_edge_toDelete]\n");
+        sprintf(sql,"CREATE EDGE toDelete from #%d:%lu to #%d:%lu",dt_cltid,dt_rid,dl_cltid,dl_rid);
+        ret = sendCommand(sql);
+        if (ret!=0){
+            printf("createData..FAILED(edge_toDelete)\n");
+            free((char*)uuidstr);
+            return NULL;
+        }
+    }
+    
+    //  DataContent
+    printf("--------------------------------------------------[create_vertex_DataContent]\n");
+    // now set schemaCode = 0
+    sprintf(sql,"CREATE VERTEX Datacontent set isDiff=%d, full_schemaCode=%d, full_byteCount=%d, full_data='%s'",FALSE,0,strlen(dataSchema),dataSchema);
+//    printf("SQL: %s\n",sql);
+    ret = createVertex(sql,&dc_cltid,&dc_rid);
+    if (ret!=0){
+        printf("createData..FAILED(vertex_DataContent)\n");
+        free((char*)uuidstr);
+        return NULL;
+    }
+    
+    //  toDataContent(head)
+    printf("--------------------------------------------------[create_edge_toDataContent_head]\n");
+    sprintf(sql,"CREATE EDGE toDataContent from #%d:%lu to #%d:%lu set type='head'",dh_cltid,dh_rid,dc_cltid,dc_rid);
+    ret = sendCommand(sql);
+    if (ret!=0){
+        printf("createData..FAILED(edge_toDataContent_head)\n");
+        free((char*)uuidstr);
+        return NULL;
+    }
+    
+    //  toDataContent(current)
+    printf("--------------------------------------------------[create_edge_toDataContent_current]\n");
+    sprintf(sql,"CREATE EDGE toDataContent from #%d:%lu to #%d:%lu set type='current'",dh_cltid,dh_rid,dc_cltid,dc_rid);
+    ret = sendCommand(sql);
+    if (ret!=0){
+        printf("createData..FAILED(edge_toDataContent_current)\n");
+        free((char*)uuidstr);
+        return NULL;
+    }
+    
+    //  toDataContent(lastestCommon)
+    printf("--------------------------------------------------[create_edge_toDataContent_lastestCommon]\n");
+    sprintf(sql,"CREATE EDGE toDataContent from #%d:%lu to #%d:%lu set type='lastestCommon'",dh_cltid,dh_rid,dc_cltid,dc_rid);
+    ret = sendCommand(sql);
+    if (ret!=0){
+        printf("createData..FAILED(edge_toDataContent_lastestCommon)\n");
+        free((char*)uuidstr);
+        return NULL;
+    }
+    
+    //  toDataHolder_fromDC
+    printf("--------------------------------------------------[create_edge_toDataHolder_fromDC]\n");
+    sprintf(sql,"CREATE EDGE toDataHolder_fromDC from #%d:%lu to #%d:%lu",dc_cltid,dc_rid,dh_cltid,dh_rid);
+    ret = sendCommand(sql);
+    if (ret!=0){
+        printf("createData..FAILED(edge_toDataHolder_fromDC)\n");
+        free((char*)uuidstr);
+        return NULL;
+    }
+    
+    return uuidstr;
+}
 
 string getDiff(char* old_str, char* new_str){
     diff_match_patch<wstring> dmp;
@@ -1620,9 +1806,12 @@ void test_setNewData(){
     free(res_diff);
     free(diff_price);
     
-    printf("\n\n\n\n--- test_getData --\n");
+//    printf("\n\n\n\n--- test_getData --\n");
 //    _mydata->content->current = _mydata->content->lastestCommon;
-    test_getData(&_mydata);
+//    test_getData(&_mydata);
+
+    printf("\n\n\n\n--- test_CRUD --\n");
+    testCRUD(&_mydata);
     
     /* free Data */
     int i=0;
@@ -1658,20 +1847,37 @@ void test_setNewData(){
 
 void test_getData(Data** data){
     Data* dt = *data;
-
+    
+//  getAttachmentFTOLinks -----------------------------------------------
+//    Text* arr_link = getAttachmentFTOLinks(dt);
+//    int i;
+//    for(i=0;arr_link[i]!=NULL;i++){
+//        printf("link[%d]: %s\n",i,arr_link[i]);
+//        free(arr_link[i]);
+//    }
+//    free(arr_link);
+//-----------------------------------------------------------------------
+    
 //  setTagContent -------------------------------------------------------
-//    int count_bytes = setTagContent(obj0,"1234567","price");
+//    ObjectBinary* obj0 = (ObjectBinary*)malloc(sizeof(ObjectBinary));
+//    obj0->schemaCode = dt->content->head->fullContent->schemaCode;
+//    obj0->byteCount = dt->content->head->fullContent->byteCount;
+//    obj0->data = strdup(dt->content->head->fullContent->data);
+//    
+//    int count_bytes = setTagContent(obj0,"1234567","attachmentFTOLinks","2");
 //    printf("schemaCode: %d\n",obj0->schemaCode);
 //    printf("byteCount: %d\n",obj0->byteCount);
 //    printf("data: %s\n",obj0->data);
+//    free(obj0->data);
+//    free(obj0);
 //-----------------------------------------------------------------------
     
 //  getTagContent + getTagContentWithName -------------------------------
-//    char* res1 = getTagContent(obj1, 2);
-//    printf("res1: %s\n",res1);
+//    char* res1 = getTagContent(dt->content->head->fullContent,_attachmentFTOLinks,"4");
+//    printf("res(enum): %s\n",res1);
 //    free(res1);
-//    char* res2 = getTagContentWithName(obj1,"genre");
-//    printf("res2: %s\n",res2);
+//    char* res2 = getTagContentWithName(dt->content->head->fullContent,"attachmentFTOLinks","4");
+//    printf("res(tagName): %s\n",res2);
 //    free(res2);
 //-----------------------------------------------------------------------
     
@@ -1743,8 +1949,34 @@ void test_getData(Data** data){
 
 }
 
-void testCRUD(){
-    char xml_schema[] = "<root><dataID></dataID><dataName></dataName><dataType></dataType><attachmentFTOLinks><link></link></attachmentFTOLinks><chatRoom></chatRoom></root>";
+void testCRUD(Data** data){
+//    prepareDB();
+    
+    int ret;
+    Sockfd = connectSocket();
+    if (Sockfd < 0){
+//        return Sockfd;
+    }
+    
+    ret = openDatabase(DB_NAME);
+    if (ret!=0) {
+        printf ("error openDatabase\n");
+//        return 1;
+    }
+    
+//    char sql[]="create vertex Data set dataName='document', dataID='123456'";
+//    short _cltid;
+//    long _rid;
+//    createVertex(sql, &_cltid, &_rid);
+//    printf("@rid #%d:%lu\n",_cltid,_rid);
+    
+    Schema test_schema[]="<root><attachmentFTOLinks></attachmentFTOLinks><book_id></book_id><author></author><title></title><genre></genre><price></price></root>";
+    createUser("Tanapon", test_schema);
+    
+    disconnectServer();
+    close(Sockfd);
+    
+    Data* dt = *data;
     
 }
 
