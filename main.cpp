@@ -7,6 +7,9 @@
 #include <netinet/in.h>
 #include <time.h>
 
+//#include "zmq.h"
+//#include "zhelpers.h"
+
 #include <string>
 #include <iostream>
 #include <cstdlib>
@@ -26,7 +29,7 @@
 #define DB_NAME "datamodel_xml"
 #define MAX_SQL_SIZE (10000)
 #define MAX_DIFF_SIZE (1000)
-#define MAX_CONTENT_SIZE (1000)
+#define MAX_CONTENT_SIZE (10000)
 #define VER_KEEPED (5)
 
 #define TRUE 1
@@ -167,8 +170,8 @@ void setChatRoom(Data* data, char* chatRoom);
 char* getDataName(Data* data);
 char* getChatRoom(Data* data);
 
-//ReturnErr setDataNameByID(char* dataID, char* dataName);
-//ReturnErr setChatRoomByID(char* dataID, char* chatRoom);
+ReturnErr setDataNameByID(char* dataID, char* dataName);
+ReturnErr setChatRoomByID(char* dataID, char* chatRoom);
 //char* getDataNameByID(char* dataID);
 //char* getChatRoomByID(char* dataID);
 
@@ -222,36 +225,38 @@ ReturnErr addTask2CategoryByID(char* categoryID, char* taskID);
 ReturnErr addSubTask2TaskByID(char* taskID, char* subTaskID);
 ReturnErr addData2DataByID(char* f_dataID, char* t_dataID, int dType);
 
-//ReturnErr addUser2Org(char* orgID, User* user);
-//ReturnErr addCategory2User(char* userID, Category* category);
-//ReturnErr addState2Category(char* categoryID, State* state);
-//ReturnErr addTask2State(char* stateID, Task* task);
-//ReturnErr addTask2Category(char* categoryID, Task* task);
-//ReturnErr addSubTask2Task(char* taskID, SubTask *subTask);
-
+ReturnErr addUser2Org(char* orgID, User* user);
+ReturnErr addCategory2User(char* userID, Category* category);
+ReturnErr addState2Category(char* categoryID, State* state);
+ReturnErr addTask2State(char* stateID, Task* task);
+ReturnErr addTask2Category(char* categoryID, Task* task);
+ReturnErr addSubTask2Task(char* taskID, SubTask *subTask);
 ReturnErr addData2Data(char* dataID, Data* data, int dType);
 
-//ReturnErr removeUserFromOrg(char* orgID, char* userID);
-//ReturnErr removeCategoryFromUser(char* userID, char* categoryID);
-//ReturnErr removeStateFromCategory(char* categoryID, char* stateID);
-//ReturnErr removeTaskFromState(char* stateID, char* taskID);
-//ReturnErr removeTaskFromCategory(char* categoryID, char* taskID);
-//ReturnErr removeSubTaskFromTask(char* taskID, char* subTaskID);
-//
-//ReturnErr removeDataFromData(char* f_dataID, char* t_dataID);
+ReturnErr removeUserFromOrg(char* orgID, char* userID);
+ReturnErr removeCategoryFromUser(char* userID, char* categoryID);
+ReturnErr removeStateFromCategory(char* categoryID, char* stateID);
+ReturnErr removeTaskFromState(char* stateID, char* taskID);
+ReturnErr removeTaskFromCategory(char* categoryID, char* taskID);
+ReturnErr removeSubTaskFromTask(char* taskID, char* subTaskID);
+ReturnErr removeDataFromData(char* f_dataID, char* t_dataID);
 
-//Data* queryDataByID(char* dataID);
-//State** queryAllStatesFromData(char* dataID);
-//Category** queryAllCategoriesFromData(char* dataID);
+Org** queryOrgFromData(char* dataID);
 //User** queryAllUsersFromData(char* dataID);
-//
-//  queryOrg/Task/SubTask ???
+//Category** queryAllCategoriesFromData(char* dataID);
+//State** queryAllStatesFromData(char* dataID);
+//Task** queryAllTasksFromData(char* dataID);
+//SubTask** queryAllSubTasksFromData(char* dataID);
+Data** queryDataFromData(char* dataID, int dType);
 
-//t_bool isObjectUnderState(char* stateID, char* objID);
-//t_bool isObjectUnderCategory(char* categoryID, char* objID);
-//t_bool isObjectOwnedByUser(char* userID, char* objID);
+Data* queryDataByID(char* dataID);
 
-//ReturnErr deleteObj(char* userID, char* objID);
+t_bool isObjectOwnedByUser(char* userID, char* objID);
+t_bool isObjectUnderCategory(char* categoryID, char* objID);
+t_bool isObjectUnderState(char* stateID, char* objID);
+t_bool isObjectUnderTask(char* stateID, char* objID);
+
+ReturnErr deleteObj(char* userID, char* upperID, char* objID);
 //ReturnErr flushTrash(char* userID);
 
 /* diff-patch function */
@@ -262,9 +267,29 @@ void test_setNewData();
 void test_getData(Data** data);
 void testCRUD(Data** data);
 
+std::string& replace(std::string& s, const std::string& from, const std::string& to);
 int main() {
+    /*
+    string s;
+    char test_str[]="\"123'4'6\"";
+    s.assign(test_str,strlen(test_str));
+    std::string str(s);
+    printf("before: %s\n",test_str);
+    
+    string result = replace(s,"'","\\'");
+    result = replace(result,"\"","\\\"");
+    printf("replace: %s\n",result.c_str());
+    */
     test_setNewData();
     return 0;
+}
+
+std::string& replace(std::string& s, const std::string& from, const std::string& to)
+{
+    if(!from.empty())
+        for(size_t pos = 0; (pos = s.find(from, pos)) != std::string::npos; pos += to.size())
+            s.replace(pos, from.size(), to);
+    return s;
 }
 
 int connectSocket() {
@@ -428,6 +453,14 @@ int prepareDB() {
     /* Edge toDelete */
     ret = createClass("toDelete","E");
     if (ret!=0) return 1;
+    
+    /* Edge toDeletedData */
+    ret = createClass("toDeletedData","E");
+    if (ret!=0) return 1;
+    
+    ret = sendCommand("CREATE PROPERTY toDeletedData.dataID STRING");
+    if (ret!=0) return 1;
+    //printf("CREATE PROPERTY toDeletedData.dataID STRING: OK!\n");
     
     /* Data */
     ret = createClass("Data","V");
@@ -807,19 +840,26 @@ char* getContent(char *query) {
         return NULL;
     
     char* str = (char*)malloc(sizeof(char)*MAX_CONTENT_SIZE);
-    
-    //for(i=0;i<total;i++){
+    char* all_str = (char*)malloc(sizeof(char)*MAX_CONTENT_SIZE);
+    for(i=0;i<total;i++){
     read(Sockfd, &size, 4);
     swapEndian(&size, INT);
     printf("size: %d\n",size);
     read(Sockfd, str, size);
     str[size]='\0';
+        strcat(all_str,"#@#");
+        strcat(all_str,str);
     printf("msg: %s\n",str);
     read(Sockfd, &GPacket.msg, 2+1+2+8+4);
     printf("[result from getContent]---------------\n",i);
-    //}
-    //printf("result(in): %s\n",str);
-    return str;
+    }
+    
+    if(total>1){
+        printf("all_str(len): %d\n",strlen(all_str));
+        return all_str;
+    }
+    else
+        return str;
 }
 
 char** getArrayRid(char* query){
@@ -984,6 +1024,30 @@ char* getChatRoom(Data* data){
     else{
         return NULL;
     }
+}
+
+ReturnErr setDataNameByID(char* dataID, char* dataName){
+    char sql[MAX_SQL_SIZE];
+    printf("--------------------------------------------------[update_dataName]\n");
+    sprintf(sql,"update Data set dataName='%s' where dataID='%s'",dataName,dataID);
+    int ret = sendCommand(sql);
+    if (ret!=0){
+        printf("setDataNameByID..FAILED(update_dataName)\n");
+        return -1;
+    }
+    return 0;
+}
+
+ReturnErr setChatRoomByID(char* dataID, char* chatRoom){
+    char sql[MAX_SQL_SIZE];
+    printf("--------------------------------------------------[update_chatRoom]\n");
+    sprintf(sql,"update Data set chatRoom='%s' where dataID='%s'",chatRoom,dataID);
+    int ret = sendCommand(sql);
+    if (ret!=0){
+        printf("setChatRoomByID..FAILED(update_chatRoom)\n");
+        return -1;
+    }
+    return 0;
 }
 
 ObjectBinary* getDataContent(Data* data){
@@ -1806,12 +1870,36 @@ ReturnErr addData2DataByID(char* f_dataID, char* t_dataID, int dType){
     return 0;
 }
 
-//ReturnErr addUser2Org(char* orgID, User* user);
-//ReturnErr addCategory2User(char* userID, Category* category);
-//ReturnErr addState2Category(char* categoryID, State* state);
-//ReturnErr addTask2State(char* stateID, Task* task);
-//ReturnErr addTask2Category(char* categoryID, Task* task);
-//ReturnErr addSubTask2Task(char* taskID, SubTask *subTask);
+ReturnErr addUser2Org(char* orgID, User* user){
+    int ret = addData2Data(orgID, user, _toUser);
+    return ret;
+}
+
+ReturnErr addCategory2User(char* userID, Category* category){
+    int ret = addData2Data(userID, category, _toCategory);
+    return ret;
+    
+}
+
+ReturnErr addState2Category(char* categoryID, State* state){
+    int ret = addData2Data(categoryID, state, _toState);
+    return ret;
+}
+
+ReturnErr addTask2State(char* stateID, Task* task){
+    int ret = addData2Data(stateID, task, _toTask);
+    return ret;
+}
+
+ReturnErr addTask2Category(char* categoryID, Task* task){
+    int ret = addData2Data(categoryID, task, _toTask);
+    return ret;
+}
+
+ReturnErr addSubTask2Task(char* taskID, SubTask *subTask){
+    int ret = addData2Data(taskID, subTask, _toSubTask);
+    return ret;
+}
 
 ReturnErr addData2Data(char* dataID, Data* data, int dType){
     int ret;
@@ -1879,24 +1967,62 @@ ReturnErr addData2Data(char* dataID, Data* data, int dType){
         printf("--------------------------------------------------[create_vertex_DataContent #%d]\n",i);
         if(dc->fullContent != NULL && dc->minusPatch == NULL && dc->plusPatch == NULL){
             printf("case1\n");
-            sprintf(sql,"CREATE VERTEX Datacontent set isDiff=%d, full_schemaCode=%d, full_byteCount=%d, full_data='%s'",dc->isDiff,dc->fullContent->schemaCode,dc->fullContent->byteCount,dc->fullContent->data);
+            
+            string init;
+            init.assign(dc->fullContent->data,strlen(dc->fullContent->data));
+            printf("before: %s\n",dc->fullContent->data);
+            string result = replace(init,"'","\\'");
+            result = replace(result,"\"","\\\"");
+            printf("replace: %s\n",result.c_str());
+            
+            sprintf(sql,"CREATE VERTEX Datacontent set isDiff=%d, full_schemaCode=%d, full_byteCount=%d, full_data='%s'",dc->isDiff,dc->fullContent->schemaCode,dc->fullContent->byteCount,result.c_str());
         }
         else if(dc->plusPatch != NULL && dc->minusPatch != NULL && dc->fullContent == NULL){
             printf("case2\n");
-            sprintf(sql,"CREATE VERTEX Datacontent set isDiff=%d, plus_schemaCode=%d, plus_byteCount=%d, plus_data='%s', minus_schemaCode=%d, minus_byteCount=%d, minus_data='%s'",dc->isDiff,dc->plusPatch->schemaCode,dc->plusPatch->byteCount,dc->plusPatch->data,dc->minusPatch->schemaCode,dc->minusPatch->byteCount,dc->minusPatch->data);
+            
+            string init;
+            init.assign(dc->plusPatch->data,strlen(dc->plusPatch->data));
+            printf("before: %s\n",dc->plusPatch->data);
+            string result = replace(init,"'","\\'");
+            result = replace(result,"\"","\\\"");
+            printf("replace: %s\n",result.c_str());
+            
+            string init2;
+            init2.assign(dc->minusPatch->data,strlen(dc->minusPatch->data));
+            printf("before: %s\n",dc->minusPatch->data);
+            string result2 = replace(init2,"'","\\'");
+            result2 = replace(result2,"\"","\\\"");
+            printf("replace: %s\n",result2.c_str());
+            
+            sprintf(sql,"CREATE VERTEX Datacontent set isDiff=%d, plus_schemaCode=%d, plus_byteCount=%d, plus_data='%s', minus_schemaCode=%d, minus_byteCount=%d, minus_data='%s'",dc->isDiff,dc->plusPatch->schemaCode,dc->plusPatch->byteCount,result.c_str(),dc->minusPatch->schemaCode,dc->minusPatch->byteCount,result2.c_str());
         }
         else if(dc->plusPatch != NULL && dc->fullContent != NULL && dc->minusPatch == NULL){
-            // bug
             printf("case3\n");
+            string init;
+            init.assign(dc->fullContent->data,strlen(dc->fullContent->data));
+            printf("before: %s\n",dc->fullContent->data);
+            string result = replace(init,"'","\\'");
+            result = replace(result,"\"","\\\"");
+            printf("replace: %s\n",result.c_str());
+            
             //  normal
-            sprintf(sql,"CREATE VERTEX Datacontent set isDiff=%d, plus_schemaCode=%d, plus_byteCount=%d, plus_data='%s', full_schemaCode=%d, full_byteCount=%d, full_data='%s'",dc->isDiff,dc->plusPatch->schemaCode,dc->plusPatch->byteCount,dc->plusPatch->data,dc->fullContent->schemaCode,dc->fullContent->byteCount,dc->fullContent->data);
+            sprintf(sql,"CREATE VERTEX Datacontent set isDiff=%d, plus_schemaCode=%d, plus_byteCount=%d, plus_data='%s', full_schemaCode=%d, full_byteCount=%d, full_data='%s'",dc->isDiff,dc->plusPatch->schemaCode,dc->plusPatch->byteCount,dc->plusPatch->data,dc->fullContent->schemaCode,dc->fullContent->byteCount,result.c_str());
+            
             //  json format
 //            sprintf(sql,"CREATE VERTEX Datacontent content {'isDiff':%d, 'plus_schemaCode':%d, 'plus_byteCount':%d, 'plus_data':'%s', 'full_schemaCode':%d, 'full_byteCount':%d, 'full_data':'%s'}",dc->isDiff,dc->plusPatch->schemaCode,dc->plusPatch->byteCount,dc->plusPatch->data,dc->fullContent->schemaCode,dc->fullContent->byteCount,dc->fullContent->data);
         }
         else{
             //  minusPatch
             printf("case4\n");
-            sprintf(sql,"CREATE VERTEX Datacontent set isDiff=%d, minus_schemaCode=%d, minus_byteCount=%d, minus_data='%s'",dc->isDiff,dc->minusPatch->schemaCode,dc->minusPatch->byteCount,dc->minusPatch->data);
+            
+            string init;
+            init.assign(dc->minusPatch->data,strlen(dc->minusPatch->data));
+            printf("before: %s\n",dc->minusPatch->data);
+            string result = replace(init,"'","\\'");
+            result = replace(result,"\"","\\\"");
+            printf("replace: %s\n",result.c_str());
+            
+            sprintf(sql,"CREATE VERTEX Datacontent set isDiff=%d, minus_schemaCode=%d, minus_byteCount=%d, minus_data='%s'",dc->isDiff,dc->minusPatch->schemaCode,dc->minusPatch->byteCount,result.c_str());
         }
         printf("SQL: %s\n",sql);
         ret = createVertex(sql,&dc_cltid[i],&dc_rid[i]);
@@ -2005,6 +2131,363 @@ ReturnErr addData2Data(char* dataID, Data* data, int dType){
     return 0;
 }
 
+ReturnErr removeUserFromOrg(char* orgID, char* userID){
+    int ret = removeDataFromData(orgID, userID);
+    return ret;
+}
+
+ReturnErr removeCategoryFromUser(char* userID, char* categoryID){
+    int ret = removeDataFromData(userID, categoryID);
+    return ret;
+}
+
+ReturnErr removeStateFromCategory(char* categoryID, char* stateID){
+    int ret = removeDataFromData(categoryID, stateID);
+    return ret;
+}
+
+ReturnErr removeTaskFromState(char* stateID, char* taskID){
+    int ret = removeDataFromData(stateID, taskID);
+    return ret;
+}
+
+ReturnErr removeTaskFromCategory(char* categoryID, char* taskID){
+    int ret = removeDataFromData(categoryID, taskID);
+    return ret;
+}
+
+ReturnErr removeSubTaskFromTask(char* taskID, char* subTaskID){
+    int ret = removeDataFromData(taskID, subTaskID);
+    return ret;
+}
+
+ReturnErr removeDataFromData(char* f_dataID, char* t_dataID){
+    char sql[MAX_SQL_SIZE];
+    printf("--------------------------------------------------[delete_edge(from..to)]\n");
+    sprintf(sql,"DELETE EDGE from (select from Data where dataID='%s') to (select from Data where dataID='%s')",f_dataID,t_dataID);
+    int ret = sendCommand(sql);
+    if (ret!=0){
+        printf("removeDataFromData..FAILED(delete_edge(from..to))\n");
+        return -1;
+    }
+    return 0;
+}
+
+ReturnErr deleteObj(char* userID, char* upperID, char* objID){
+    char sql[MAX_SQL_SIZE];
+
+    //  delete edge
+    printf("--------------------------------------------------[delete_edge(from..to)]\n");
+    sprintf(sql,"DELETE EDGE from (select from Data where dataID='%s') to (select from Data where dataID='%s')",upperID,objID);
+    int ret = sendCommand(sql);
+    if (ret!=0){
+        printf("deleteObj..FAILED(delete_edge(from..to))\n");
+        return -1;
+    }
+    
+    //  create edge + set dataID
+    printf("--------------------------------------------------[create_edge_toDeletedData]\n");
+    sprintf(sql,"create edge toDeletedData from (select from Delete where userID='%s') to (select from Data where dataID='%s') set  dataID='%s'",userID,objID,upperID);
+    ret = sendCommand(sql);
+    if (ret!=0){
+        printf("deleteObj..FAILED(create_edge_toDeletedData)\n");
+        return -1;
+    }
+    
+    return 0;
+}
+
+Org** queryOrgFromData(char* dataID){
+    char sql[MAX_SQL_SIZE];
+    
+    
+    printf("--------------------------------------------------[get @rid_org]\n");
+//    sprintf(sql,"select expand($c) let $a = (select @rid from (select expand(in().in().in()) from (select from Data where dataID='27932585089147AAB22BD2C59E2DBD4B')) where dataType=5), $b = (select @rid from (select expand(in().in()) from (select from Data where dataID='27932585089147AAB22BD2C59E2DBD4B')) where dataType=5), $c = unionall($a, $b)");
+    return NULL;
+}
+
+Data** queryDataFromData(char* dataID, int dType){
+    char sql[MAX_SQL_SIZE];
+    
+    switch(dType){
+        case _org:
+            printf("--------------------------------------------------[get @rid_org]\n");
+            break;
+        case _user:
+            printf("--------------------------------------------------[get @rid_user]\n");
+            break;
+        case _category:
+            printf("--------------------------------------------------[get @rid_category]\n");
+            break;
+        case _state:
+            printf("--------------------------------------------------[get @rid_state]\n");
+            break;
+        case _task:
+            printf("--------------------------------------------------[get @rid_task]\n");
+            break;
+        case _subTask:
+            printf("--------------------------------------------------[get @rid_subTask]\n");
+            break;
+        default:
+            return NULL;
+            break;
+            
+    }
+    sprintf(sql,"select expand($f) let $a = (select @rid from (select expand(in().in().in().in().in()) from (select from Data where dataID='%s')) where dataType=%d), $b = (select @rid from (select expand(in().in().in().in()) from (select from Data where dataID='%s')) where dataType=%d), $c = (select @rid from (select expand(in().in().in()) from (select from Data where dataID='%s')) where dataType=%d), $d = (select @rid from (select expand(in().in()) from (select from Data where dataID='%s')) where dataType=%d), $e = (select @rid from (select expand(in()) from (select from Data where dataID='%s')) where dataType=%d), $f = unionall($a, $b, $c, $d, $e)",dataID,dType,dataID,dType,dataID,dType,dataID,dType,dataID,dType);
+    
+    char** result_rid = getArrayRid(sql);
+    
+    if(result_rid==NULL){
+        printf("no result\n");
+    }
+    else{
+        int i;
+        for(i=0;result_rid[i]!=NULL;i++)
+            printf("record[%d]: %s\n",i,result_rid[i]);
+    }
+    return NULL;
+}
+
+Data* queryDataByID(char* dataID){
+    char sql[MAX_SQL_SIZE];
+    char* token;
+    
+    //  Data
+    Data* dt = (Data*)malloc(sizeof(Data));
+    printf("--------------------------------------------------[get_info_Data]\n");
+    sprintf(sql,"SELECT dataID,dataName,dataType,chatRoom from Data where dataID='%s'",dataID);
+    printf("SQL: %s\n",sql);
+    char* result = getContent(sql);
+    
+    if(result==NULL){
+        return NULL;
+    }
+    printf("result: %s\n\n\n\n\n",result);
+    printf("--- Data ---\n");
+    
+    token = strtok(result,"\"");
+    token = strtok(NULL,"\"");
+    printf("dataID: %s\n",token);
+    dt->dataID = strdup(token);
+    
+    
+    token = strtok(NULL,"\"");
+    token = strtok(NULL,"\"");
+    printf("dataName: %s\n",token);
+    dt->dataName = strdup(token);
+    
+    token = strtok(NULL,":");
+    token = strtok(NULL,",");
+    printf("dataType: %s\n",token);
+    token = strtok(NULL,"\"");
+    token = strtok(NULL,"\"");
+    printf("chatRoom: %s\n\n",token);
+
+    free(result);
+    
+    //  DataHolder
+    DataHolder* dh = (DataHolder*)malloc(sizeof(DataHolder));
+    dt->content = dh;
+    printf("--------------------------------------------------[get_info_DataHolder]\n");
+    sprintf(sql,"SELECT @rid,versionKeeped from (select expand(out('toDataHolder')) from Data where dataID='%s')",dataID);
+    printf("SQL: %s\n",sql);
+    result = getContent(sql);
+    
+    if(result==NULL){
+        return NULL;
+    }
+    printf("result: %s\n\n\n\n\n",result);
+    printf("--- DataHolder ---\n");
+    
+    token = strtok(result,":");
+    token = strtok(NULL,",");
+    printf("dh_@rid: %s\n",token);
+    char* rid_dh = strdup(token);
+    
+    token = strtok(NULL,":");
+    token = strtok(NULL,",");
+    printf("versionKeeped: %s\n\n",token);
+    dh->versionKeeped = atoi(token);
+    dh->head = NULL;
+    dh->lastestCommon = NULL;
+    dh->current = NULL;
+    
+    free(result);
+    
+    //  DataContent
+    printf("--------------------------------------------------[get_count_DataContent]\n");
+    sprintf(sql,"select count(*) from (select expand(in('toDataHolder_fromDC')) from %s)",rid_dh);
+    printf("SQL: %s\n",sql);
+    result = getContent(sql);
+    
+    if(result==NULL){
+        return NULL;
+    }
+    printf("result: %s\n\n\n\n\n",result);
+    token = strtok(result,":");
+    token = strtok(NULL,"l");
+    printf("count: %s\n\n",token);
+    int count = atoi(token);
+    
+    free(result);
+    
+    DataContent* dc[count];
+    int i;
+    for(i=0;i<count;i++){
+        dc[i] = (DataContent*)malloc(sizeof(DataContent));
+    }
+    
+    //  next/pre/dataHd SHA256hashCode timeStamp = NULL plus/minus/full isDiff
+    
+    sprintf(sql,"select isDiff,SHA256hashCode,timeStamp,plus_schemaCode,plus_byteCount,plus_data,minus_schemaCode,minus_byteCount,minus_data,full_schemaCode,full_byteCount,full_data from (select expand(in('toDataHolder_fromDC')) from %s)",rid_dh);
+    printf("SQL: %s\n",sql);
+    result = getContent(sql);
+    
+    if(result==NULL){
+        return NULL;
+    }
+    printf("result: %s\n\n\n\n\n",result);
+    
+//    string init;
+//    init.assign(result,strlen(result));
+//    string rp_str = replace(init,"\\'","'");
+//    rp_str = replace(rp_str,"\\\"","\"");
+//    printf("replace: %s\n\n\n\n",rp_str.c_str());
+//    
+//    int x = rp_str.find("#@#");
+//    printf("found: %d\n",x);
+//    
+//    int y = rp_str.find("#@#",x+1);
+//    printf("found: %d\n",y);
+//    printf("text: %s\n",result+y);
+    
+    /*
+    free(result);
+    result = strdup(rp_str.c_str());
+    
+    char* p1 = strstr(result,"#@#")+3;
+    char* p2 = strstr(p1,"#@#");
+    long len = p2-p1;
+    char* res = (char*)malloc(sizeof(char)*(len+1));
+    strncpy(res, p1, len);
+    res[len] = '\0';
+    printf("\n\n\nfirst_dc:\n%s\n", res);
+    char temp[700];
+    memcpy(temp, result+len, strlen(result)-len);
+    printf("temp: %s\n",temp);
+    
+    p1 = strstr(result+len,"#@#")+3;
+    p2 = strstr(p1,"#@#");
+    len = p2-p1;
+    char* res2 = (char*)malloc(sizeof(char)*(len+1));
+    strncpy(res2, p1, len);
+    res2[len] = '\0';
+    printf("\n\n\nsecond_dc:\n%s\n", res);
+    */
+    
+//    char* tmp_tok = strtok(result,"#");
+//    char **dc_str = (char**)malloc(sizeof(char*)*count);
+//
+//    for(i=0;i<count;i++){
+//        printf("--- DataContent[%d] ---\n",i);
+//        printf("tmp_tok: %s\n",tmp_tok);
+//        printf("len: %d\n",strlen(tmp_tok));
+//        
+//        dc_str[i]= strdup(tmp_tok);
+//        printf("\n\ndc_str: %s\n",dc_str[i]);
+//
+////        free(dc_str[i]);
+////        dc[i]->timeStamp = NULL;
+////        dc[i]->minusPatch = NULL;
+////        dc[i]->plusPatch = NULL;
+////        dc[i]->fullContent = NULL;
+////        dc[i]->dataHd = dh;
+////        
+////        if(i!=0){
+////            dc[i]->preVersion = dc[i-1];
+////        }
+////        if(i!=count-1){
+////            dc[i]->nextVersion = dc[i+1];
+////        }
+//        
+//        tmp_tok = strtok(NULL, "#");
+//    }
+//    int j=0;
+//    token = strtok(dc_str[0],":");
+//    token = strtok(NULL,",");
+//    for(i=0;i<count;i++){
+//        printf("\n[%d]\n",i);
+////        token = strtok(dc_str[i],":");
+////        token = strtok(NULL,",");
+//        printf("isDiff: %s\n",token);
+//
+//        token = strtok(NULL,":");
+//        token = strtok(NULL,",");
+//        printf("SHA256hashCode: %s\n",token);
+//        
+//        
+//        printf("in loop . . .\n");
+//        while(token!=NULL){
+//            if(j!=0)
+//                token = strtok(NULL,",");
+//            token = strtok(NULL,":");
+//            printf("key: %s\n",token);
+//            if(token == NULL)
+//                break;
+//            if(strcmp(token,"minus_schemaCode")==0){
+//                printf("\n[minus]\n");
+//                token = strtok(NULL,",");
+//                printf("schemaCode: %s\n",token);
+//                
+//                token = strtok(NULL,":");
+//                token = strtok(NULL,",");
+//                printf("bytecount: %s\n",token);
+//                
+//                token = strtok(NULL,"\"");
+//                token = strtok(NULL,"\"");
+//                printf("minus: %s\n",token);
+////                char* p1 = strstr(token,
+//            }
+//            else if(strcmp(token,"plus_schemaCode")==0){
+//                printf("\n[plus]\n");
+//                token = strtok(NULL,",");
+//                printf("schemaCode: %s\n",token);
+//                
+//                token = strtok(NULL,":");
+//                token = strtok(NULL,",");
+//                printf("bytecount: %s\n",token);
+//                
+//                token = strtok(NULL,"\"");
+//                token = strtok(NULL,"\"");
+//                printf("plus: %s\n",token);
+//            }
+//            if(strcmp(token,"full_schemaCode")==0){
+//                printf("\n[full]\n");
+//                token = strtok(NULL,",");
+//                printf("schemaCode: %s\n",token);
+//                
+//                token = strtok(NULL,":");
+//                token = strtok(NULL,",");
+//                printf("bytecount: %s\n",token);
+//                
+//                token = strtok(NULL,"\"");
+//                token = strtok(NULL,"\"");
+//                printf("full: %s\n",token);
+//            }
+////            break;
+//            j++;
+//        }
+//        
+//        free(dc_str[i]);
+//    }
+    return NULL;
+}
+
+t_bool isObjectOwnedByUser(char* userID, char* objID);
+//t_bool isObjectUnderCategory(char* categoryID, char* objID);
+//t_bool isObjectUnderState(char* stateID, char* objID);
+//t_bool isObjectUnderTask(char* stateID, char* objID);
+
 string getDiff(char* old_str, char* new_str){
     diff_match_patch<wstring> dmp;
     string s;
@@ -2067,7 +2550,7 @@ void test_setNewData(){
     setNewDataDiffWithTag(_mydata, "price", NULL, diff_price);
     setNewDataDiffWithTag(_mydata, "titel", NULL, "hello");
     
-    setDataName(_mydata, "test-Category");
+    setDataName(_mydata, "mySubTask");
     printf("dataName: %s\n",_mydata->dataName);
     setChatRoom(_mydata, "chat-room");
     printf("chatRoom: %s\n",_mydata->chatRoom);
@@ -2086,8 +2569,8 @@ void test_setNewData(){
 //    _mydata->content->current = _mydata->content->lastestCommon;
 //    test_getData(&_mydata);
 
-//    printf("\n\n\n\n--- test_CRUD --\n");
-//    testCRUD(&_mydata);
+    printf("\n\n\n\n--- test_CRUD --\n");
+    testCRUD(&_mydata);
     
     /* free Data */
     int i=0;
@@ -2100,14 +2583,17 @@ void test_setNewData(){
         if(mydc->timeStamp != NULL)
             free(mydc->timeStamp->timeStampCode);
         if(mydc->minusPatch != NULL){
+            printf("minus: %s\n",mydc->minusPatch->data);
             free(mydc->minusPatch->data);
             free(mydc->minusPatch);
         }
         if(mydc->plusPatch != NULL){
+            printf("plus: %s\n",mydc->plusPatch->data);
             free(mydc->plusPatch->data);
             free(mydc->plusPatch);
         }
         if(mydc->fullContent != NULL){
+            printf("full: %s\n",mydc->fullContent->data);
             free(mydc->fullContent->data);
             free(mydc->fullContent);
         }
@@ -2249,15 +2735,58 @@ void testCRUD(Data** data){
     
     Schema test_schema[]="<root><attachmentFTOLinks></attachmentFTOLinks><book_id></book_id><author></author><title></title><genre></genre><price></price></root>";
     
-//    createUser("Tanapoom", test_schema);
-//    createCategory("Doc", test_schema);
-//    addData2DataByID("64E0D9327B70470AB00CB4B85289819F", "5D93E6C8F185442E890943AAEC0969EC", _toCategory);
+//    const char* uuid_user = createUser("Pimpat", test_schema);
+//    const char* uuid_cat = createCategory("Pics", test_schema);
+//    addData2DataByID("A99B27E341CA424D84FADCCB5B856910", "F93ED6BDFB07420D972E92A65AB0842A", _toCategory);
     
-    Data* dt = *data;
-    addData2Data("5C53EE6A663F42CBB2B89EBC72A83974",dt,_toCategory);
+//    Data* dt = *data;
+//    addData2Data("27932585089147AAB22BD2C59E2DBD4B",dt,_toSubTask);
+    
+//    removeCategoryFromUser("A99B27E341CA424D84FADCCB5B856910", "2CE74EB7700A4D919D7027B82743E977");
+    
+//    addCategory2UserByID((char*)uuid_user, (char*)uuid_cat);
+//    addCategory2UserByID("A99B27E341CA424D84FADCCB5B856910", "94EAB83CA7A34010BCD5AD296EFF4BBC");
+    
+//    const char* uuid_task = createTask("myTask", test_schema);
+//    addTask2CategoryByID("94EAB83CA7A34010BCD5AD296EFF4BBC", (char*)uuid_task);
+    
+//    const char* uuid_state = createState("myState2", test_schema);
+//    addState2CategoryByID("2CE74EB7700A4D919D7027B82743E977",(char*)uuid_state);
+//    
+//    addTask2StateByID((char*)uuid_state,"27932585089147AAB22BD2C59E2DBD4B");
+    
+//    setDataNameByID("A99B27E341CA424D84FADCCB5B856910","Tanapon");
+//    setChatRoomByID("A99B27E341CA424D84FADCCB5B856910", "chat-room2");
+    
+/*
+    char sql1[]="select from (select expand(out('toCategory').out('toState')) from Data where dataID='A99B27E341CA424D84FADCCB5B856910')";
+    char sql2[]="select from (select expand(out('toCategory').out('toState')) from Data where dataID='E426EE67B22545B99B278A2F874FFECD')";
+    char* res1 = getContent(sql1);
+    printf("res1: %s\n",res1);
+    char* res2 = getContent(sql2);
+    printf("res2: %s\n",res2);
+*/
+    char sql3[]="select expand($c) let $a = (select @rid from (select expand(in().in().in()) from (select from Data where dataID='27932585089147AAB22BD2C59E2DBD4B')) where dataType=5), $b = (select @rid from (select expand(in().in()) from (select from Data where dataID='27932585089147AAB22BD2C59E2DBD4B')) where dataType=5), $c = unionall($a, $b)";
+    
+    char sql4[] ="select expand($f) let $a = (select @rid from (select expand(in().in().in().in().in()) from (select from Data where dataID='27932585089147AAB22BD2C59E2DBD4B')) where dataType=5), $b = (select @rid from (select expand(in().in().in().in()) from (select from Data where dataID='27932585089147AAB22BD2C59E2DBD4B')) where dataType=5), $c = (select @rid from (select expand(in().in().in()) from (select from Data where dataID='27932585089147AAB22BD2C59E2DBD4B')) where dataType=5), $d = (select @rid from (select expand(in().in()) from (select from Data where dataID='27932585089147AAB22BD2C59E2DBD4B')) where dataType=5), $e = (select @rid from (select expand(in()) from (select from Data where dataID='27932585089147AAB22BD2C59E2DBD4B')) where dataType=5), $f = unionall($a, $b, $c, $d, $e)";
+//    char* result = getContent(sql3);
+//    printf("result:%s\n",result);
+    
+//    char** result_rid = getArrayRid(sql4);
+//    queryDataFromData("27932585089147AAB22BD2C59E2DBD4B", _org);
+//    const char* uuid_org = createOrg("Throughwave",test_schema);
+//    addUser2OrgByID((char*)uuid_org,"A99B27E341CA424D84FADCCB5B856910");
+    
+    queryDataByID("73AF3C108B2249B28713BDB89A7FD851");
+    
+//    deleteObj("A99B27E341CA424D84FADCCB5B856910","2CE74EB7700A4D919D7027B82743E977", "7981CF1C2B624DB19D8EF7D761A5FF55");
+    
     
     disconnectServer();
     close(Sockfd);
+//    free((char*)uuid_state);
+//    free((char*)uuid_user);
+//    free((char*)uuid_cat);
  
 }
 

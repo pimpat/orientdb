@@ -13,6 +13,9 @@
 #include <cstdio>
 #include <fstream>
 
+#include <zmq.h>
+#include "zhelpers.h"
+
 #include <uuid/uuid.h>
 //#include <jansson.h>
 #include "reqmsg.h"
@@ -263,6 +266,11 @@ void test_getData(Data** data);
 void testCRUD(Data** data);
 
 int main() {
+//    void *context = zmq_ctx_new ();
+//    void *responder = zmq_socket (context, ZMQ_REP);
+//    int rc = zmq_bind (responder, "tcp://*:5555");
+//    assert (rc == 0);
+//    printf("\n\n\n\rc %d\n\n\n\n",rc);
     test_setNewData();
     return 0;
 }
