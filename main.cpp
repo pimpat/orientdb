@@ -254,7 +254,8 @@ Data* queryDataByID(char* dataID);
 t_bool isObjectOwnedByUser(char* userID, char* objID);
 t_bool isObjectUnderCategory(char* categoryID, char* objID);
 t_bool isObjectUnderState(char* stateID, char* objID);
-t_bool isObjectUnderTask(char* stateID, char* objID);
+t_bool isObjectUnderTask(char* taskID, char* objID);
+t_bool isObjectUnderData(char* dataID, char* objID);
 
 ReturnErr deleteObj(char* userID, char* upperID, char* objID);
 //ReturnErr flushTrash(char* userID);
@@ -442,13 +443,13 @@ int prepareDB() {
     ret = createClass("toSubTask","E");
     if (ret!=0) return 1;
     
-    /* Delete */
-    ret = createClass("Delete","V");
+    /* DeleteNode */
+    ret = createClass("DeleteNode","V");
     if (ret!=0) return 1;
     
-    ret = sendCommand("CREATE PROPERTY Delete.userID STRING");
+    ret = sendCommand("CREATE PROPERTY DeleteNode.userID STRING");
     if (ret!=0) return 1;
-    //printf("CREATE PROPERTY Delete.userID STRING: OK!\n");
+    //printf("CREATE PROPERTY DeleteNode.userID STRING: OK!\n");
     
     /* Edge toDelete */
     ret = createClass("toDelete","E");
@@ -1726,11 +1727,11 @@ const char* createData(Text dataName, Schema* dataSchema, int dType){
     
     //  Delete (for User only)
     if(dType==_user){
-        printf("--------------------------------------------------[create_vertex_Delete]\n");
-        sprintf(sql,"CREATE VERTEX Delete set userID='%s'",uuidstr);
+        printf("--------------------------------------------------[create_vertex_DeleteNode]\n");
+        sprintf(sql,"CREATE VERTEX DeleteNode set userID='%s'",uuidstr);
         ret = createVertex(sql,&dl_cltid,&dl_rid);
         if (ret!=0){
-            printf("createData..FAILED(vertex_Delete)\n");
+            printf("createData..FAILED(vertex_DeleteNode)\n");
             free((char*)uuidstr);
             return NULL;
         }
@@ -1937,11 +1938,11 @@ ReturnErr addData2Data(char* dataID, Data* data, int dType){
     
     //  Delete (for User only)
     if(dType==_toUser){
-        printf("--------------------------------------------------[create_vertex_Delete]\n");
-        sprintf(sql,"CREATE VERTEX Delete set userID='%s'",data->dataID);
+        printf("--------------------------------------------------[create_vertex_DeleteNode]\n");
+        sprintf(sql,"CREATE VERTEX DeleteNode set userID='%s'",data->dataID);
         ret = createVertex(sql,&dl_cltid,&dl_rid);
         if (ret!=0){
-            printf("addData2Data..FAILED(vertex_Delete)\n");
+            printf("addData2Data..FAILED(vertex_DeleteNode)\n");
             return -1;
         }
         
@@ -2187,7 +2188,7 @@ ReturnErr deleteObj(char* userID, char* upperID, char* objID){
     
     //  create edge + set dataID
     printf("--------------------------------------------------[create_edge_toDeletedData]\n");
-    sprintf(sql,"create edge toDeletedData from (select from Delete where userID='%s') to (select from Data where dataID='%s') set  dataID='%s'",userID,objID,upperID);
+    sprintf(sql,"create edge toDeletedData from (select from DeleteNode where userID='%s') to (select from Data where dataID='%s') set  dataID='%s'",userID,objID,upperID);
     ret = sendCommand(sql);
     if (ret!=0){
         printf("deleteObj..FAILED(create_edge_toDeletedData)\n");
@@ -2233,18 +2234,46 @@ Data** queryDataFromData(char* dataID, int dType){
             break;
             
     }
-    sprintf(sql,"select expand($f) let $a = (select @rid from (select expand(in().in().in().in().in()) from (select from Data where dataID='%s')) where dataType=%d), $b = (select @rid from (select expand(in().in().in().in()) from (select from Data where dataID='%s')) where dataType=%d), $c = (select @rid from (select expand(in().in().in()) from (select from Data where dataID='%s')) where dataType=%d), $d = (select @rid from (select expand(in().in()) from (select from Data where dataID='%s')) where dataType=%d), $e = (select @rid from (select expand(in()) from (select from Data where dataID='%s')) where dataType=%d), $f = unionall($a, $b, $c, $d, $e)",dataID,dType,dataID,dType,dataID,dType,dataID,dType,dataID,dType);
+    sprintf(sql,"select expand($g) let $g = (select distinct(rid) from (select expand($f) let $a = (select @rid from (select expand(in().in().in().in().in()) from (select from Data where dataID='%s')) where dataType=%d), $b = (select @rid from (select expand(in().in().in().in()) from (select from Data where dataID='%s')) where dataType=%d), $c = (select @rid from (select expand(in().in().in()) from (select from Data where dataID='%s')) where dataType=%d), $d = (select @rid from (select expand(in().in()) from (select from Data where dataID='%s')) where dataType=%d), $e = (select @rid from (select expand(in()) from (select from Data where dataID='%s')) where dataType=%d), $f = unionall($a, $b, $c, $d, $e)))",dataID,dType,dataID,dType,dataID,dType,dataID,dType,dataID,dType);
     
+//    sprintf(sql,"select expand($f) let $a = (select @rid from (select expand(in().in().in().in().in()) from (select from Data where dataID='%s')) where dataType=%d), $b = (select @rid from (select expand(in().in().in().in()) from (select from Data where dataID='%s')) where dataType=%d), $c = (select @rid from (select expand(in().in().in()) from (select from Data where dataID='%s')) where dataType=%d), $d = (select @rid from (select expand(in().in()) from (select from Data where dataID='%s')) where dataType=%d), $e = (select @rid from (select expand(in()) from (select from Data where dataID='%s')) where dataType=%d), $f = unionall($a, $b, $c, $d, $e)",dataID,dType,dataID,dType,dataID,dType,dataID,dType,dataID,dType);
+    int i,j;
     char** result_rid = getArrayRid(sql);
-    
     if(result_rid==NULL){
-        printf("no result\n");
+        printf("no result_rid\n");
+        return NULL;
     }
     else{
-        int i;
         for(i=0;result_rid[i]!=NULL;i++)
-            printf("record[%d]: %s\n",i,result_rid[i]);
+            printf("result_rid[%d]: %s\n",i,result_rid[i]);
     }
+    
+    sprintf(sql,"select expand($m) let $m=(select distinct(rid) from (select expand($l) let $h = (select @rid from (select expand(in()) from (select expand(in().in().in().in()) from (select from Data where dataID='%s')) where @class='DeleteNode')), $i = (select @rid from (select expand(in()) from (select expand(in().in().in()) from (select from Data where dataID='%s')) where @class='DeleteNode')), $j = (select @rid from (select expand(in()) from (select expand(in().in()) from (select from Data where dataID='%s')) where @class='DeleteNode')), $k = (select @rid from (select expand(in()) from (select expand(in()) from (select from Data where dataID='%s')) where @class='DeleteNode')), $l = unionall($h, $i, $j, $k)))",dataID,dataID,dataID,dataID);
+    char** dup_rid = getArrayRid(sql);
+    if(dup_rid!=NULL){
+        for(i=0;dup_rid[i]!=NULL;i++)
+            printf("dup_rid[%d]: %s\n",i,dup_rid[i]);
+        
+        for(i=0;dup_rid[i]!=NULL;i++){
+            for(j=0;result_rid[j]!=NULL;j++){
+                if(strcmp(result_rid[j],dup_rid[i])==0){
+                    sprintf(result_rid[j],"%s","-");
+                    break;
+                }
+            }
+        }
+    }
+    else{
+        printf("no dup_id\n");
+
+    }
+
+    for(j=0;result_rid[j]!=NULL;j++){
+        if(result_rid[j]!="-"){
+            printf("filter_rid: %s\n",result_rid[j]);
+        }
+    }
+    
     return NULL;
 }
 
@@ -2483,10 +2512,51 @@ Data* queryDataByID(char* dataID){
     return NULL;
 }
 
-t_bool isObjectOwnedByUser(char* userID, char* objID);
-//t_bool isObjectUnderCategory(char* categoryID, char* objID);
-//t_bool isObjectUnderState(char* stateID, char* objID);
-//t_bool isObjectUnderTask(char* stateID, char* objID);
+t_bool isObjectOwnedByUser(char* userID, char* objID){
+    t_bool bl = isObjectUnderData(userID,objID);
+    return bl;
+}
+
+t_bool isObjectUnderCategory(char* categoryID, char* objID){
+    t_bool bl = isObjectUnderData(categoryID,objID);
+    return bl;
+}
+
+t_bool isObjectUnderState(char* stateID, char* objID){
+    t_bool bl = isObjectUnderData(stateID,objID);
+    return bl;
+}
+
+t_bool isObjectUnderTask(char* taskID, char* objID){
+    t_bool bl = isObjectUnderData(taskID,objID);
+    return bl;
+}
+
+t_bool isObjectUnderData(char* dataID, char* objID){
+    char sql[MAX_SQL_SIZE];
+    
+    printf("--------------------------------------------------[get_count_path]\n");
+    sprintf(sql,"select count(*) from(select expand(path) from(select shortestPath((select from Data where dataID='%s'),(select from Data where dataID='%s'),'IN') as path))",objID,dataID);
+//    printf("SQL: %s\n",sql);
+    char* result = getContent(sql);
+    if(result==NULL){
+        printf("not found dataID/objID\n");
+        return FALSE;
+    }
+    printf("result: %s\n",result);
+    char* token = strtok(result,":");
+    token = strtok(NULL,"l");
+    printf("count: %s\n",token);
+    
+    if(strcmp(token,"0")!=0){
+        printf("object is under data.\n");
+        return TRUE;
+    }
+    else{
+        printf("object isn't under data.\n");
+        return FALSE;
+    }
+}
 
 string getDiff(char* old_str, char* new_str){
     diff_match_patch<wstring> dmp;
@@ -2734,26 +2804,35 @@ void testCRUD(Data** data){
 //    printf("@rid #%d:%lu\n",_cltid,_rid);
     
     Schema test_schema[]="<root><attachmentFTOLinks></attachmentFTOLinks><book_id></book_id><author></author><title></title><genre></genre><price></price></root>";
+    /*
+    const char* uuid_user = createUser("Pimpat", test_schema);
+    const char* uuid_user2 = createUser("Tanapon", test_schema);
+    const char* uuid_cat = createCategory("Pics", test_schema);
+    const char* uuid_cat2 = createCategory("test-Category", test_schema);
+    const char* uuid_task = createTask("myTask", test_schema);
+    const char* uuid_state = createState("myState", test_schema);
+    const char* uuid_state2 = createState("myState2", test_schema);
     
-//    const char* uuid_user = createUser("Pimpat", test_schema);
-//    const char* uuid_cat = createCategory("Pics", test_schema);
-//    addData2DataByID("A99B27E341CA424D84FADCCB5B856910", "F93ED6BDFB07420D972E92A65AB0842A", _toCategory);
+    //  Pimpat --> Pics
+    addData2DataByID((char*)uuid_user, (char*)uuid_cat, _toCategory);
+    //  Tanapon --> Pics
+    addData2DataByID((char*)uuid_user2, (char*)uuid_cat, _toCategory);
+    //  Tanapon --> test-Category
+    addData2DataByID((char*)uuid_user2, (char*)uuid_cat2, _toCategory);
+    //  Pics --> myTask
+    addTask2CategoryByID((char*)uuid_cat, (char*)uuid_task);
+    //  test-Category --> myState
+    addState2CategoryByID((char*)uuid_cat2,(char*)uuid_state);
+    //  test-Category --> myState2
+    addState2CategoryByID((char*)uuid_cat2,(char*)uuid_state2);
+    //  myState2 --> myTask
+    addTask2StateByID((char*)uuid_state2,(char*)uuid_task);
     
+    //  delete myState
+    deleteObj((char*)uuid_user2, (char*)uuid_cat2, (char*)uuid_state);
+    */
 //    Data* dt = *data;
 //    addData2Data("27932585089147AAB22BD2C59E2DBD4B",dt,_toSubTask);
-    
-//    removeCategoryFromUser("A99B27E341CA424D84FADCCB5B856910", "2CE74EB7700A4D919D7027B82743E977");
-    
-//    addCategory2UserByID((char*)uuid_user, (char*)uuid_cat);
-//    addCategory2UserByID("A99B27E341CA424D84FADCCB5B856910", "94EAB83CA7A34010BCD5AD296EFF4BBC");
-    
-//    const char* uuid_task = createTask("myTask", test_schema);
-//    addTask2CategoryByID("94EAB83CA7A34010BCD5AD296EFF4BBC", (char*)uuid_task);
-    
-//    const char* uuid_state = createState("myState2", test_schema);
-//    addState2CategoryByID("2CE74EB7700A4D919D7027B82743E977",(char*)uuid_state);
-//    
-//    addTask2StateByID((char*)uuid_state,"27932585089147AAB22BD2C59E2DBD4B");
     
 //    setDataNameByID("A99B27E341CA424D84FADCCB5B856910","Tanapon");
 //    setChatRoomByID("A99B27E341CA424D84FADCCB5B856910", "chat-room2");
@@ -2766,6 +2845,7 @@ void testCRUD(Data** data){
     char* res2 = getContent(sql2);
     printf("res2: %s\n",res2);
 */
+    
     char sql3[]="select expand($c) let $a = (select @rid from (select expand(in().in().in()) from (select from Data where dataID='27932585089147AAB22BD2C59E2DBD4B')) where dataType=5), $b = (select @rid from (select expand(in().in()) from (select from Data where dataID='27932585089147AAB22BD2C59E2DBD4B')) where dataType=5), $c = unionall($a, $b)";
     
     char sql4[] ="select expand($f) let $a = (select @rid from (select expand(in().in().in().in().in()) from (select from Data where dataID='27932585089147AAB22BD2C59E2DBD4B')) where dataType=5), $b = (select @rid from (select expand(in().in().in().in()) from (select from Data where dataID='27932585089147AAB22BD2C59E2DBD4B')) where dataType=5), $c = (select @rid from (select expand(in().in().in()) from (select from Data where dataID='27932585089147AAB22BD2C59E2DBD4B')) where dataType=5), $d = (select @rid from (select expand(in().in()) from (select from Data where dataID='27932585089147AAB22BD2C59E2DBD4B')) where dataType=5), $e = (select @rid from (select expand(in()) from (select from Data where dataID='27932585089147AAB22BD2C59E2DBD4B')) where dataType=5), $f = unionall($a, $b, $c, $d, $e)";
@@ -2773,12 +2853,16 @@ void testCRUD(Data** data){
 //    printf("result:%s\n",result);
     
 //    char** result_rid = getArrayRid(sql4);
-//    queryDataFromData("27932585089147AAB22BD2C59E2DBD4B", _org);
+    
+//    queryDataFromData("15F8C836874B4BD0AAA560B8807618AE", _user);
+    isObjectUnderData("5983E69EC4A64E7F930C08632D42B29D","D71525A8448B4726BBC353091DA352AD");
+    isObjectUnderData("D71525A8448B4726BBC353091DA352AD","5983E69EC4A64E7F930C08632D42B29D");
+    
 //    const char* uuid_org = createOrg("Throughwave",test_schema);
 //    addUser2OrgByID((char*)uuid_org,"A99B27E341CA424D84FADCCB5B856910");
     
-    queryDataByID("73AF3C108B2249B28713BDB89A7FD851");
-    
+//    queryDataByID("73AF3C108B2249B28713BDB89A7FD851");
+//    queryDataFromData(<#char *dataID#>, <#int dType#>);
 //    deleteObj("A99B27E341CA424D84FADCCB5B856910","2CE74EB7700A4D919D7027B82743E977", "7981CF1C2B624DB19D8EF7D761A5FF55");
     
     
