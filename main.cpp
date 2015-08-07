@@ -848,7 +848,7 @@ char* getContent(char *query) {
     printf("size: %d\n",size);
     read(Sockfd, str, size);
     str[size]='\0';
-        strcat(all_str,"#@#");
+        strcat(all_str,"#");
         strcat(all_str,str);
     printf("msg: %s\n",str);
     read(Sockfd, &GPacket.msg, 2+1+2+8+4);
@@ -1750,7 +1750,7 @@ const char* createData(Text dataName, Schema* dataSchema, int dType){
     //  DataContent
     printf("--------------------------------------------------[create_vertex_DataContent]\n");
     // now set schemaCode = 0
-    sprintf(sql,"CREATE VERTEX Datacontent set isDiff=%d, full_schemaCode=%d, full_byteCount=%d, full_data='%s'",FALSE,0,strlen(dataSchema),dataSchema);
+    sprintf(sql,"CREATE VERTEX Datacontent set isDiff=%d, SHA256hashCode='%s', full_schemaCode=%d, full_byteCount=%d, full_data='%s'",FALSE,"h-a-s-h",0,strlen(dataSchema),dataSchema);
 //    printf("SQL: %s\n",sql);
     ret = createVertex(sql,&dc_cltid,&dc_rid);
     if (ret!=0){
@@ -1976,7 +1976,7 @@ ReturnErr addData2Data(char* dataID, Data* data, int dType){
             result = replace(result,"\"","\\\"");
             printf("replace: %s\n",result.c_str());
             
-            sprintf(sql,"CREATE VERTEX Datacontent set isDiff=%d, full_schemaCode=%d, full_byteCount=%d, full_data='%s'",dc->isDiff,dc->fullContent->schemaCode,dc->fullContent->byteCount,result.c_str());
+            sprintf(sql,"CREATE VERTEX Datacontent set isDiff=%d, SHA256hashCode='%s', full_schemaCode=%d, full_byteCount=%d, full_data='%s'",dc->isDiff,dc->SHA256hashCode,dc->fullContent->schemaCode,dc->fullContent->byteCount,result.c_str());
         }
         else if(dc->plusPatch != NULL && dc->minusPatch != NULL && dc->fullContent == NULL){
             printf("case2\n");
@@ -1995,7 +1995,7 @@ ReturnErr addData2Data(char* dataID, Data* data, int dType){
             result2 = replace(result2,"\"","\\\"");
             printf("replace: %s\n",result2.c_str());
             
-            sprintf(sql,"CREATE VERTEX Datacontent set isDiff=%d, plus_schemaCode=%d, plus_byteCount=%d, plus_data='%s', minus_schemaCode=%d, minus_byteCount=%d, minus_data='%s'",dc->isDiff,dc->plusPatch->schemaCode,dc->plusPatch->byteCount,result.c_str(),dc->minusPatch->schemaCode,dc->minusPatch->byteCount,result2.c_str());
+            sprintf(sql,"CREATE VERTEX Datacontent set isDiff=%d, SHA256hashCode='%s', plus_schemaCode=%d, plus_byteCount=%d, plus_data='%s', minus_schemaCode=%d, minus_byteCount=%d, minus_data='%s'",dc->isDiff,dc->SHA256hashCode,dc->plusPatch->schemaCode,dc->plusPatch->byteCount,result.c_str(),dc->minusPatch->schemaCode,dc->minusPatch->byteCount,result2.c_str());
         }
         else if(dc->plusPatch != NULL && dc->fullContent != NULL && dc->minusPatch == NULL){
             printf("case3\n");
@@ -2007,7 +2007,7 @@ ReturnErr addData2Data(char* dataID, Data* data, int dType){
             printf("replace: %s\n",result.c_str());
             
             //  normal
-            sprintf(sql,"CREATE VERTEX Datacontent set isDiff=%d, plus_schemaCode=%d, plus_byteCount=%d, plus_data='%s', full_schemaCode=%d, full_byteCount=%d, full_data='%s'",dc->isDiff,dc->plusPatch->schemaCode,dc->plusPatch->byteCount,dc->plusPatch->data,dc->fullContent->schemaCode,dc->fullContent->byteCount,result.c_str());
+            sprintf(sql,"CREATE VERTEX Datacontent set isDiff=%d, SHA256hashCode='%s', plus_schemaCode=%d, plus_byteCount=%d, plus_data='%s', full_schemaCode=%d, full_byteCount=%d, full_data='%s'",dc->isDiff,dc->SHA256hashCode,dc->plusPatch->schemaCode,dc->plusPatch->byteCount,dc->plusPatch->data,dc->fullContent->schemaCode,dc->fullContent->byteCount,result.c_str());
             
             //  json format
 //            sprintf(sql,"CREATE VERTEX Datacontent content {'isDiff':%d, 'plus_schemaCode':%d, 'plus_byteCount':%d, 'plus_data':'%s', 'full_schemaCode':%d, 'full_byteCount':%d, 'full_data':'%s'}",dc->isDiff,dc->plusPatch->schemaCode,dc->plusPatch->byteCount,dc->plusPatch->data,dc->fullContent->schemaCode,dc->fullContent->byteCount,dc->fullContent->data);
@@ -2023,7 +2023,7 @@ ReturnErr addData2Data(char* dataID, Data* data, int dType){
             result = replace(result,"\"","\\\"");
             printf("replace: %s\n",result.c_str());
             
-            sprintf(sql,"CREATE VERTEX Datacontent set isDiff=%d, minus_schemaCode=%d, minus_byteCount=%d, minus_data='%s'",dc->isDiff,dc->minusPatch->schemaCode,dc->minusPatch->byteCount,result.c_str());
+            sprintf(sql,"CREATE VERTEX Datacontent set isDiff=%d, SHA256hashCode='%s', minus_schemaCode=%d, minus_byteCount=%d, minus_data='%s'",dc->isDiff,dc->SHA256hashCode,dc->minusPatch->schemaCode,dc->minusPatch->byteCount,result.c_str());
         }
         printf("SQL: %s\n",sql);
         ret = createVertex(sql,&dc_cltid[i],&dc_rid[i]);
@@ -2237,6 +2237,7 @@ Data** queryDataFromData(char* dataID, int dType){
     sprintf(sql,"select expand($g) let $g = (select distinct(rid) from (select expand($f) let $a = (select @rid from (select expand(in().in().in().in().in()) from (select from Data where dataID='%s')) where dataType=%d), $b = (select @rid from (select expand(in().in().in().in()) from (select from Data where dataID='%s')) where dataType=%d), $c = (select @rid from (select expand(in().in().in()) from (select from Data where dataID='%s')) where dataType=%d), $d = (select @rid from (select expand(in().in()) from (select from Data where dataID='%s')) where dataType=%d), $e = (select @rid from (select expand(in()) from (select from Data where dataID='%s')) where dataType=%d), $f = unionall($a, $b, $c, $d, $e)))",dataID,dType,dataID,dType,dataID,dType,dataID,dType,dataID,dType);
     
 //    sprintf(sql,"select expand($f) let $a = (select @rid from (select expand(in().in().in().in().in()) from (select from Data where dataID='%s')) where dataType=%d), $b = (select @rid from (select expand(in().in().in().in()) from (select from Data where dataID='%s')) where dataType=%d), $c = (select @rid from (select expand(in().in().in()) from (select from Data where dataID='%s')) where dataType=%d), $d = (select @rid from (select expand(in().in()) from (select from Data where dataID='%s')) where dataType=%d), $e = (select @rid from (select expand(in()) from (select from Data where dataID='%s')) where dataType=%d), $f = unionall($a, $b, $c, $d, $e)",dataID,dType,dataID,dType,dataID,dType,dataID,dType,dataID,dType);
+    
     int i,j;
     char** result_rid = getArrayRid(sql);
     if(result_rid==NULL){
@@ -2377,84 +2378,47 @@ Data* queryDataByID(char* dataID){
     }
     printf("result: %s\n\n\n\n\n",result);
     
-//    string init;
-//    init.assign(result,strlen(result));
-//    string rp_str = replace(init,"\\'","'");
-//    rp_str = replace(rp_str,"\\\"","\"");
-//    printf("replace: %s\n\n\n\n",rp_str.c_str());
-//    
-//    int x = rp_str.find("#@#");
-//    printf("found: %d\n",x);
-//    
-//    int y = rp_str.find("#@#",x+1);
-//    printf("found: %d\n",y);
-//    printf("text: %s\n",result+y);
-    
-    /*
-    free(result);
-    result = strdup(rp_str.c_str());
-    
-    char* p1 = strstr(result,"#@#")+3;
-    char* p2 = strstr(p1,"#@#");
-    long len = p2-p1;
-    char* res = (char*)malloc(sizeof(char)*(len+1));
-    strncpy(res, p1, len);
-    res[len] = '\0';
-    printf("\n\n\nfirst_dc:\n%s\n", res);
-    char temp[700];
-    memcpy(temp, result+len, strlen(result)-len);
-    printf("temp: %s\n",temp);
-    
-    p1 = strstr(result+len,"#@#")+3;
-    p2 = strstr(p1,"#@#");
-    len = p2-p1;
-    char* res2 = (char*)malloc(sizeof(char)*(len+1));
-    strncpy(res2, p1, len);
-    res2[len] = '\0';
-    printf("\n\n\nsecond_dc:\n%s\n", res);
-    */
-    
-//    char* tmp_tok = strtok(result,"#");
-//    char **dc_str = (char**)malloc(sizeof(char*)*count);
-//
-//    for(i=0;i<count;i++){
-//        printf("--- DataContent[%d] ---\n",i);
-//        printf("tmp_tok: %s\n",tmp_tok);
-//        printf("len: %d\n",strlen(tmp_tok));
+    char* tmp_tok = strtok(result,"#");
+    char **dc_str = (char**)malloc(sizeof(char*)*count);
+
+    for(i=0;i<count;i++){
+        printf("--- DataContent[%d] ---\n",i);
+        printf("tmp_tok: %s\n",tmp_tok);
+        printf("len: %d\n",strlen(tmp_tok));
+        
+        dc_str[i]= strdup(tmp_tok);
+        printf("\n\ndc_str: %s\n",dc_str[i]);
+
+//        free(dc_str[i]);
+//        dc[i]->timeStamp = NULL;
+//        dc[i]->minusPatch = NULL;
+//        dc[i]->plusPatch = NULL;
+//        dc[i]->fullContent = NULL;
+//        dc[i]->dataHd = dh;
 //        
-//        dc_str[i]= strdup(tmp_tok);
-//        printf("\n\ndc_str: %s\n",dc_str[i]);
-//
-////        free(dc_str[i]);
-////        dc[i]->timeStamp = NULL;
-////        dc[i]->minusPatch = NULL;
-////        dc[i]->plusPatch = NULL;
-////        dc[i]->fullContent = NULL;
-////        dc[i]->dataHd = dh;
-////        
-////        if(i!=0){
-////            dc[i]->preVersion = dc[i-1];
-////        }
-////        if(i!=count-1){
-////            dc[i]->nextVersion = dc[i+1];
-////        }
-//        
-//        tmp_tok = strtok(NULL, "#");
-//    }
-//    int j=0;
+//        if(i!=0){
+//            dc[i]->preVersion = dc[i-1];
+//        }
+//        if(i!=count-1){
+//            dc[i]->nextVersion = dc[i+1];
+//        }
+        
+        tmp_tok = strtok(NULL, "#");
+    }
+    
+    int j=0;
 //    token = strtok(dc_str[0],":");
 //    token = strtok(NULL,",");
-//    for(i=0;i<count;i++){
-//        printf("\n[%d]\n",i);
-////        token = strtok(dc_str[i],":");
-////        token = strtok(NULL,",");
-//        printf("isDiff: %s\n",token);
-//
-//        token = strtok(NULL,":");
-//        token = strtok(NULL,",");
-//        printf("SHA256hashCode: %s\n",token);
-//        
-//        
+    for(i=0;i<count;i++){
+        printf("\n[%d]\n",i);
+        token = strtok(dc_str[i],":");
+        token = strtok(NULL,",");
+        printf("isDiff: %s\n",token);
+
+        token = strtok(NULL,"\"");
+        token = strtok(NULL,"\"");
+        printf("SHA256hashCode: %s\n",token);
+   
 //        printf("in loop . . .\n");
 //        while(token!=NULL){
 //            if(j!=0)
@@ -2464,17 +2428,20 @@ Data* queryDataByID(char* dataID){
 //            if(token == NULL)
 //                break;
 //            if(strcmp(token,"minus_schemaCode")==0){
-//                printf("\n[minus]\n");
-//                token = strtok(NULL,",");
-//                printf("schemaCode: %s\n",token);
-//                
-//                token = strtok(NULL,":");
-//                token = strtok(NULL,",");
-//                printf("bytecount: %s\n",token);
-//                
-//                token = strtok(NULL,"\"");
-//                token = strtok(NULL,"\"");
-//                printf("minus: %s\n",token);
+        printf("\n[minus]\n");
+        token = strtok(NULL,":");
+        token = strtok(NULL,",");
+        printf("schemaCode: %s\n",token);
+
+        token = strtok(NULL,":");
+        token = strtok(NULL,",");
+        printf("bytecount: %s\n",token);
+                
+        token = strtok(NULL,"\"");
+        token = strtok(NULL,"\"");
+        printf("minus: %s\n",token);
+        printf("len: %d\n",strlen(token));
+        break;
 ////                char* p1 = strstr(token,
 //            }
 //            else if(strcmp(token,"plus_schemaCode")==0){
@@ -2506,9 +2473,9 @@ Data* queryDataByID(char* dataID){
 ////            break;
 //            j++;
 //        }
-//        
-//        free(dc_str[i]);
-//    }
+    
+        free(dc_str[i]);
+    }
     return NULL;
 }
 
@@ -2534,10 +2501,14 @@ t_bool isObjectUnderTask(char* taskID, char* objID){
 
 t_bool isObjectUnderData(char* dataID, char* objID){
     char sql[MAX_SQL_SIZE];
-    
     printf("--------------------------------------------------[get_count_path]\n");
-    sprintf(sql,"select count(*) from(select expand(path) from(select shortestPath((select from Data where dataID='%s'),(select from Data where dataID='%s'),'IN') as path))",objID,dataID);
-//    printf("SQL: %s\n",sql);
+    
+    //  for ordb 2.0
+    sprintf(sql,"select count(*) from (traverse in() from (select from Data where dataID='%s')) where dataID = '%s'",objID,dataID);
+    
+    //  for ordb 2.1
+//    sprintf(sql,"select count(*) from(select expand(path) from(select shortestPath((select from Data where dataID='%s'),(select from Data where dataID='%s'),'IN') as path))",objID,dataID);
+    printf("SQL: %s\n",sql);
     char* result = getContent(sql);
     if(result==NULL){
         printf("not found dataID/objID\n");
@@ -2620,7 +2591,7 @@ void test_setNewData(){
     setNewDataDiffWithTag(_mydata, "price", NULL, diff_price);
     setNewDataDiffWithTag(_mydata, "titel", NULL, "hello");
     
-    setDataName(_mydata, "mySubTask");
+    setDataName(_mydata, "mySubTask2");
     printf("dataName: %s\n",_mydata->dataName);
     setChatRoom(_mydata, "chat-room");
     printf("chatRoom: %s\n",_mydata->chatRoom);
@@ -2788,13 +2759,11 @@ void testCRUD(Data** data){
     Sockfd = connectSocket();
     if (Sockfd < 0){
         printf ("error connectSocket\n");
-//        return Sockfd;
     }
     
     ret = openDatabase(DB_NAME);
     if (ret!=0) {
         printf ("error openDatabase\n");
-//        return 1;
     }
     
 //    char sql[]="create vertex Data set dataName='document', dataID='123456'";
@@ -2803,8 +2772,9 @@ void testCRUD(Data** data){
 //    createVertex(sql, &_cltid, &_rid);
 //    printf("@rid #%d:%lu\n",_cltid,_rid);
     
+/*
     Schema test_schema[]="<root><attachmentFTOLinks></attachmentFTOLinks><book_id></book_id><author></author><title></title><genre></genre><price></price></root>";
-    /*
+    
     const char* uuid_user = createUser("Pimpat", test_schema);
     const char* uuid_user2 = createUser("Tanapon", test_schema);
     const char* uuid_cat = createCategory("Pics", test_schema);
@@ -2830,9 +2800,10 @@ void testCRUD(Data** data){
     
     //  delete myState
     deleteObj((char*)uuid_user2, (char*)uuid_cat2, (char*)uuid_state);
-    */
-//    Data* dt = *data;
-//    addData2Data("27932585089147AAB22BD2C59E2DBD4B",dt,_toSubTask);
+*/
+    
+    Data* dt = *data;
+//    addData2Data("E4DEA39D5E7646918E07B414C2CC0671",dt,_toSubTask);
     
 //    setDataNameByID("A99B27E341CA424D84FADCCB5B856910","Tanapon");
 //    setChatRoomByID("A99B27E341CA424D84FADCCB5B856910", "chat-room2");
@@ -2855,14 +2826,16 @@ void testCRUD(Data** data){
 //    char** result_rid = getArrayRid(sql4);
     
 //    queryDataFromData("15F8C836874B4BD0AAA560B8807618AE", _user);
-    isObjectUnderData("5983E69EC4A64E7F930C08632D42B29D","D71525A8448B4726BBC353091DA352AD");
-    isObjectUnderData("D71525A8448B4726BBC353091DA352AD","5983E69EC4A64E7F930C08632D42B29D");
+    
+    //  test-Category --> myState2 ??
+    isObjectUnderData("2603169373904B9FBF05F72620D70F3D","A1C49651099946C7B2F9CD0B70092797");
+    //  myState2 --> test-Category ??
+    isObjectUnderData("A1C49651099946C7B2F9CD0B70092797","2603169373904B9FBF05F72620D70F3D");
     
 //    const char* uuid_org = createOrg("Throughwave",test_schema);
 //    addUser2OrgByID((char*)uuid_org,"A99B27E341CA424D84FADCCB5B856910");
     
-//    queryDataByID("73AF3C108B2249B28713BDB89A7FD851");
-//    queryDataFromData(<#char *dataID#>, <#int dType#>);
+    queryDataByID("AB461924401F4B98B3DBB183CA9FEA50");
 //    deleteObj("A99B27E341CA424D84FADCCB5B856910","2CE74EB7700A4D919D7027B82743E977", "7981CF1C2B624DB19D8EF7D761A5FF55");
     
     
