@@ -2378,102 +2378,188 @@ Data* queryDataByID(char* dataID){
     }
     printf("result: %s\n\n\n\n\n",result);
     
+    string init;
+    init.assign(result);
+    printf("before: %s\n",result);
+    string res = replace(init,"\\'","'");
+    res = replace(res,"\\\"","\"");
+    printf("\n------------------------------------------------------------------------------------------------------------\n\n");
+    printf("replace: %s\n",res.c_str());
+    printf("\n------------------------------------------------------------------------------------------------------------\n\n");
+    
+    result = strdup(res.c_str());
+    
     char* tmp_tok = strtok(result,"#");
     char **dc_str = (char**)malloc(sizeof(char*)*count);
 
     for(i=0;i<count;i++){
         printf("--- DataContent[%d] ---\n",i);
         printf("tmp_tok: %s\n",tmp_tok);
-        printf("len: %d\n",strlen(tmp_tok));
+//        printf("len: %d\n",strlen(tmp_tok));
         
         dc_str[i]= strdup(tmp_tok);
-        printf("\n\ndc_str: %s\n",dc_str[i]);
+        printf("\ndc_str: %s\n",dc_str[i]);
 
-//        free(dc_str[i]);
-//        dc[i]->timeStamp = NULL;
-//        dc[i]->minusPatch = NULL;
-//        dc[i]->plusPatch = NULL;
-//        dc[i]->fullContent = NULL;
-//        dc[i]->dataHd = dh;
-//        
-//        if(i!=0){
-//            dc[i]->preVersion = dc[i-1];
-//        }
-//        if(i!=count-1){
-//            dc[i]->nextVersion = dc[i+1];
-//        }
+        dc[i]->timeStamp = NULL;
+        dc[i]->minusPatch = NULL;
+        dc[i]->plusPatch = NULL;
+        dc[i]->fullContent = NULL;
+        dc[i]->dataHd = dh;
+
+        if(i!=0){
+            dc[i]->preVersion = dc[i-1];
+        }
+        if(i!=count-1){
+            dc[i]->nextVersion = dc[i+1];
+        }
         
         tmp_tok = strtok(NULL, "#");
     }
     
-    int j=0;
-//    token = strtok(dc_str[0],":");
-//    token = strtok(NULL,",");
+    //        char test[64] = "abc 123";
+    //        char abc[6];
+    //        int num;
+    //        sscanf(test, "%s %d", abc, &num);
+    //        printf("t: '%s' '%d'\n", abc, num);
+    
+//    char test[80], blah[80];
+//    char *sep = "\\/:;=-";
+//    char *word, *phrase, *brkt, *brkb;
+//    
+//    strcpy(test, "This;is.a:test:of=the/string\\tokenizer-function.");
+//    
+//    for (word = strtok_r(test, sep, &brkt);word;word = strtok_r(NULL, sep, &brkt)){
+//        strcpy(blah, "blah:blat:blab:blag");
+//        
+//        for (phrase = strtok_r(blah, sep, &brkb);phrase;phrase = strtok_r(NULL, sep, &brkb)){
+//            printf("So far we're at %s:%s\n", word, phrase);
+//            printf("%s\t%s\n",brkt,brkb);
+//            brkt = brkt+10;
+//            printf("%s\n",brkt);
+//        }
+//    }
+    free(result);
+
+    char* br;
+    char* pt_data;
+
     for(i=0;i<count;i++){
         printf("\n[%d]\n",i);
-        token = strtok(dc_str[i],":");
-        token = strtok(NULL,",");
+
+        token = strtok_r(dc_str[i],":",&br);
+        token = strtok_r(NULL,",",&br);
         printf("isDiff: %s\n",token);
-
-        token = strtok(NULL,"\"");
-        token = strtok(NULL,"\"");
+        
+        token = strtok_r(NULL,"\"",&br);
+        token = strtok_r(NULL,"\"",&br);
         printf("SHA256hashCode: %s\n",token);
-   
-//        printf("in loop . . .\n");
-//        while(token!=NULL){
-//            if(j!=0)
-//                token = strtok(NULL,",");
-//            token = strtok(NULL,":");
-//            printf("key: %s\n",token);
-//            if(token == NULL)
-//                break;
-//            if(strcmp(token,"minus_schemaCode")==0){
-        printf("\n[minus]\n");
-        token = strtok(NULL,":");
-        token = strtok(NULL,",");
-        printf("schemaCode: %s\n",token);
+        
+//        free(result);
+        result = br+1;
+        printf("result: %s\n",result);
+//        result = strdup(br+1);
+//        char* tt = strdup(br+1);
+//        printf("tt: %s\n",tt);
+//        token = strtok_r(tt,":",&br);
+        token = strtok_r(result, ":", &br);
+        
+        while(token!=NULL){
+            printf("key: %s\n",token);
+            if(token == NULL)
+                break;
+            if(strcmp(token,"minus_schemaCode")==0){
+                printf("\n[minus]\n");
+                token = strtok_r(NULL,",",&br);
+                printf("schemaCode: %s\n",token);
 
-        token = strtok(NULL,":");
-        token = strtok(NULL,",");
-        printf("bytecount: %s\n",token);
+                token = strtok_r(NULL,":",&br);
+                token = strtok_r(NULL,",",&br);
+                printf("bytecount: %s\n",token);
+                printf("br: %s\n",br);
+                pt_data = br+12;
                 
-        token = strtok(NULL,"\"");
-        token = strtok(NULL,"\"");
-        printf("minus: %s\n",token);
-        printf("len: %d\n",strlen(token));
-        break;
-////                char* p1 = strstr(token,
-//            }
-//            else if(strcmp(token,"plus_schemaCode")==0){
-//                printf("\n[plus]\n");
-//                token = strtok(NULL,",");
-//                printf("schemaCode: %s\n",token);
-//                
-//                token = strtok(NULL,":");
-//                token = strtok(NULL,",");
-//                printf("bytecount: %s\n",token);
-//                
-//                token = strtok(NULL,"\"");
-//                token = strtok(NULL,"\"");
-//                printf("plus: %s\n",token);
-//            }
+                int count = atoi(token);
+                dc[i]->minusPatch = (ObjectBinary*)malloc(sizeof(ObjectBinary));
+                dc[i]->minusPatch->data = (char*)calloc(count+1,sizeof(char));
+                memcpy(dc[i]->minusPatch->data,pt_data,count);
+                printf("dc_data: %s\n",dc[i]->minusPatch->data);
+//                strcat(dc[i]->minusPatch->data,"1");
+//                printf("len: %d\n",strlen(dc[i]->minusPatch->data));
+//                printf("--- %c\n",dc[i]->minusPatch->data[count]);
+                pt_data = br+12+count+1;
+                if(pt_data[0] == '\0'){
+                    printf("data is NULL\n");
+                    break;
+                }
+                else{
+                    pt_data = br+11+count+2;
+                    printf("pt_data: %s\n",pt_data);
+                    token = strtok_r(pt_data,":",&br);
+                }
+            }
+//            token = NULL;
+            else if(strcmp(token,"plus_schemaCode")==0){
+                printf("\n[plus]\n");
+                token = strtok_r(NULL,",",&br);
+                printf("schemaCode: %s\n",token);
+                
+                token = strtok_r(NULL,":",&br);
+                token = strtok_r(NULL,",",&br);
+                printf("bytecount: %s\n",token);
+                printf("br: %s\n",br);
+                pt_data = br+11;
+                printf("pt_data: %s\n",pt_data);
+                
+                int count = atoi(token);
+                printf("count: %d\n",count);
+                dc[i]->plusPatch = (ObjectBinary*)malloc(sizeof(ObjectBinary));
+                dc[i]->plusPatch->data = (char*)calloc(count+1,sizeof(char));
+                memcpy(dc[i]->plusPatch->data,pt_data,count);
+                printf("dc_data: %s\n",dc[i]->plusPatch->data);
+//                printf("len: %d\n",strlen(dc[i]->plusPatch->data));
+//                printf("--- %c\n",dc[i]->plusPatch->data[count-2]);
+                pt_data = br+11+count+1;
+                if(pt_data[0] == '\0'){
+                    printf("data is NULL\n");
+                    break;
+                }
+                else{
+                    pt_data = br+11+count+2;
+                    printf("pt_data: %s\n",pt_data);
+                    token = strtok_r(pt_data,":",&br);
+                }
+            }
 //            if(strcmp(token,"full_schemaCode")==0){
-//                printf("\n[full]\n");
-//                token = strtok(NULL,",");
-//                printf("schemaCode: %s\n",token);
-//                
-//                token = strtok(NULL,":");
-//                token = strtok(NULL,",");
-//                printf("bytecount: %s\n",token);
-//                
-//                token = strtok(NULL,"\"");
-//                token = strtok(NULL,"\"");
-//                printf("full: %s\n",token);
-//            }
-////            break;
-//            j++;
-//        }
-    
+            else{
+                printf("\n[full]\n");
+                token = strtok_r(NULL,",",&br);
+                printf("schemaCode: %s\n",token);
+                
+                token = strtok_r(NULL,":",&br);
+                token = strtok_r(NULL,",",&br);
+                printf("bytecount: %s\n",token);
+                printf("br: %s\n",br);
+                pt_data = br+11;
+                printf("pt_data: %s\n",pt_data);
+                
+                int count = atoi(token);
+                printf("count: %d\n",count);
+                dc[i]->fullContent = (ObjectBinary*)malloc(sizeof(ObjectBinary));
+                dc[i]->fullContent->data = (char*)calloc(count+1,sizeof(char));
+                memcpy(dc[i]->fullContent->data,pt_data,count);
+                printf("dc_data: %s\n",dc[i]->fullContent->data);
+                
+                pt_data = br+11+count+1;
+                if(pt_data[0] == '\0'){
+                    printf("data is NULL\n");
+                    break;
+                }
+                else{
+                    pt_data = br+11+count+2;
+                    printf("pt_data: %s\n",pt_data);
+                }
+            }
+        }
         free(dc_str[i]);
     }
     return NULL;
@@ -2630,6 +2716,8 @@ void test_setNewData(){
         }
         if(mydc->plusPatch != NULL){
             printf("plus: %s\n",mydc->plusPatch->data);
+            printf("len: %d\n",strlen(mydc->plusPatch->data));
+            printf("sizeof: %d\n",sizeof(mydc->plusPatch->data));
             free(mydc->plusPatch->data);
             free(mydc->plusPatch);
         }
