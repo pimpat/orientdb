@@ -156,6 +156,7 @@ int createVertex(char *command, short* cltid, long* rid);
 char* getRid(char *query);
 char* getContent(char *query);
 char** getArrayRid(char* query);
+char** getArrayDistinctRid(char* query);
 
 /* datamodel function */
 const char* stringUUID();
@@ -242,13 +243,14 @@ ReturnErr removeSubTaskFromTask(char* taskID, char* subTaskID);
 ReturnErr removeDataFromData(char* f_dataID, char* t_dataID);
 
 Org** queryOrgFromData(char* dataID);
-//User** queryAllUsersFromData(char* dataID);
-//Category** queryAllCategoriesFromData(char* dataID);
-//State** queryAllStatesFromData(char* dataID);
-//Task** queryAllTasksFromData(char* dataID);
-//SubTask** queryAllSubTasksFromData(char* dataID);
+User** queryAllUsersFromData(char* dataID);
+Category** queryAllCategoriesFromData(char* dataID);
+State** queryAllStatesFromData(char* dataID);
+Task** queryAllTasksFromData(char* dataID);
+SubTask** queryAllSubTasksFromData(char* dataID);
 Data** queryDataFromData(char* dataID, int dType);
 
+Data* queryDataByRid(char* rid);
 Data* queryDataByID(char* dataID);
 
 t_bool isObjectOwnedByUser(char* userID, char* objID);
@@ -258,7 +260,7 @@ t_bool isObjectUnderTask(char* taskID, char* objID);
 t_bool isObjectUnderData(char* dataID, char* objID);
 
 ReturnErr deleteObj(char* userID, char* upperID, char* objID);
-//ReturnErr flushTrash(char* userID);
+ReturnErr flushTrash(char* userID);
 
 /* diff-patch function */
 string getDiff(char* old_str, char* new_str);
@@ -910,6 +912,53 @@ char** getArrayRid(char* query){
     //    for(i=0;result_rid[i]!=NULL;i++) {
     //        printf("TEST_rid: %s\n",result_rid[i]);
     //    }
+    
+    return result_rid;
+}
+
+char** getArrayDistinctRid(char* query){
+    int i, ret, size, total;
+    GPacket.opType = REQUEST_COMMAND;
+    size = reqQueryMsg(GPacket.msg, "q", query);
+    ret = write(Sockfd, &GPacket, 5+size);
+    
+    ret = read(Sockfd, &GPacket, 5);
+    //printf("ret:%d\n", ret);
+    printf("opType:%d\n", GPacket.opType);
+    if (ret<0 || GPacket.opType!=0) {
+        printf("FAILED >> getArrayRid\n");
+        return NULL;
+    }
+    
+    read(Sockfd, &GPacket.msg, 1);
+    read(Sockfd, &total, 4);
+    swapEndian(&total, INT);
+    printf("total: %d\n",total);    // total record
+    read(Sockfd, &GPacket.msg, 2+1+2+8+4);
+    
+    if(total==0)
+        return NULL;
+    
+    char **result_rid = (char**)malloc(sizeof(char*)*total+1);
+    
+    for(i=0;i<total;i++){
+        read(Sockfd, &size, 4);
+        swapEndian(&size, INT);
+        printf("[%d]--------------------------------------------------\n",i);
+        printf("size: %d\t",size);
+        result_rid[i] = (char*)malloc(sizeof(char)*size-3);
+        
+        //  read content
+        read(Sockfd, &GPacket.msg, 4);
+        read(Sockfd, &GPacket.msg, size-4);
+        GPacket.msg[size-4]='\0';
+        printf("msg: %s\n", GPacket.msg);
+        sprintf(result_rid[i],"%s",GPacket.msg+5);
+        //printf("len: %d\n",strlen(result_rid[i]));
+        printf("myrid: %s\n",result_rid[i]);
+        read(Sockfd, &GPacket.msg, 2+1+2+8+4);
+    }
+    result_rid[i] = NULL;
     
     return result_rid;
 }
@@ -2194,17 +2243,52 @@ ReturnErr deleteObj(char* userID, char* upperID, char* objID){
         printf("deleteObj..FAILED(create_edge_toDeletedData)\n");
         return -1;
     }
+    return 0;
+}
+
+ReturnErr flushTrash(char* userID){
+    char sql[MAX_SQL_SIZE];
     
+    //  delete edge toDeletedData
+    printf("--------------------------------------------------[delete_edge_toDeletedData(by userID)]\n");
+    
+    sprintf(sql,"delete edge from (select from DeleteNode where userID='%s')",userID);
+    int ret = sendCommand(sql);
+    if (ret!=0){
+        printf("deleteObj..FAILED(delete_edge(from..to))\n");
+        return -1;
+    }
     return 0;
 }
 
 Org** queryOrgFromData(char* dataID){
-    char sql[MAX_SQL_SIZE];
-    
-    
-    printf("--------------------------------------------------[get @rid_org]\n");
-//    sprintf(sql,"select expand($c) let $a = (select @rid from (select expand(in().in().in()) from (select from Data where dataID='27932585089147AAB22BD2C59E2DBD4B')) where dataType=5), $b = (select @rid from (select expand(in().in()) from (select from Data where dataID='27932585089147AAB22BD2C59E2DBD4B')) where dataType=5), $c = unionall($a, $b)");
-    return NULL;
+    Org** org = queryDataFromData(dataID, _org);
+    return org;
+}
+
+User** queryAllUsersFromData(char* dataID){
+    User** user = queryDataFromData(dataID, _user);
+    return user;
+}
+
+Category** queryAllCategoriesFromData(char* dataID){
+    Category** cat = queryDataFromData(dataID, _category);
+    return  cat;
+}
+
+State** queryAllStatesFromData(char* dataID){
+    State** state = queryDataFromData(dataID, _state);
+    return  state;
+}
+
+Task** queryAllTasksFromData(char* dataID){
+    Task** task = queryDataFromData(dataID, _task);
+    return task;
+}
+
+SubTask** queryAllSubTasksFromData(char* dataID){
+    SubTask** subTask = queryDataFromData(dataID, _subTask);
+    return subTask;
 }
 
 Data** queryDataFromData(char* dataID, int dType){
@@ -2234,12 +2318,12 @@ Data** queryDataFromData(char* dataID, int dType){
             break;
             
     }
-    sprintf(sql,"select expand($g) let $g = (select distinct(rid) from (select expand($f) let $a = (select @rid from (select expand(in().in().in().in().in()) from (select from Data where dataID='%s')) where dataType=%d), $b = (select @rid from (select expand(in().in().in().in()) from (select from Data where dataID='%s')) where dataType=%d), $c = (select @rid from (select expand(in().in().in()) from (select from Data where dataID='%s')) where dataType=%d), $d = (select @rid from (select expand(in().in()) from (select from Data where dataID='%s')) where dataType=%d), $e = (select @rid from (select expand(in()) from (select from Data where dataID='%s')) where dataType=%d), $f = unionall($a, $b, $c, $d, $e)))",dataID,dType,dataID,dType,dataID,dType,dataID,dType,dataID,dType);
-    
-//    sprintf(sql,"select expand($f) let $a = (select @rid from (select expand(in().in().in().in().in()) from (select from Data where dataID='%s')) where dataType=%d), $b = (select @rid from (select expand(in().in().in().in()) from (select from Data where dataID='%s')) where dataType=%d), $c = (select @rid from (select expand(in().in().in()) from (select from Data where dataID='%s')) where dataType=%d), $d = (select @rid from (select expand(in().in()) from (select from Data where dataID='%s')) where dataType=%d), $e = (select @rid from (select expand(in()) from (select from Data where dataID='%s')) where dataType=%d), $f = unionall($a, $b, $c, $d, $e)",dataID,dType,dataID,dType,dataID,dType,dataID,dType,dataID,dType);
+
+    sprintf(sql,"select distinct(rid) from (select expand($f) let $a = (select @rid from (select expand(in().in().in().in().in()) from (select from Data where dataID='%s')) where dataType=%d), $c = (select @rid from (select expand(in().in().in()) from (select from Data where dataID='%s')) where dataType=%d), $d = (select @rid from (select expand(in().in()) from (select from Data where dataID='%s')) where dataType=%d), $e = (select @rid from (select expand(in()) from (select from Data where dataID='%s')) where dataType=%d), $f = unionall($a, $b, $c, $d, $e))",dataID,dType,dataID,dType,dataID,dType,dataID,dType,dataID,dType);
+    printf("SQL: %s\n",sql);
     
     int i,j;
-    char** result_rid = getArrayRid(sql);
+    char** result_rid = getArrayDistinctRid(sql);
     if(result_rid==NULL){
         printf("no result_rid\n");
         return NULL;
@@ -2249,12 +2333,16 @@ Data** queryDataFromData(char* dataID, int dType){
             printf("result_rid[%d]: %s\n",i,result_rid[i]);
     }
     
-    sprintf(sql,"select expand($m) let $m=(select distinct(rid) from (select expand($l) let $h = (select @rid from (select expand(in()) from (select expand(in().in().in().in()) from (select from Data where dataID='%s')) where @class='DeleteNode')), $i = (select @rid from (select expand(in()) from (select expand(in().in().in()) from (select from Data where dataID='%s')) where @class='DeleteNode')), $j = (select @rid from (select expand(in()) from (select expand(in().in()) from (select from Data where dataID='%s')) where @class='DeleteNode')), $k = (select @rid from (select expand(in()) from (select expand(in()) from (select from Data where dataID='%s')) where @class='DeleteNode')), $l = unionall($h, $i, $j, $k)))",dataID,dataID,dataID,dataID);
-    char** dup_rid = getArrayRid(sql);
+    sprintf(sql,"select distinct(rid) from (select expand($l) let $h = (select @rid from (select expand(in()) from (select expand(in().in().in().in()) from (select from Data where dataID='%s')) where @class='DeleteNode')), $i = (select @rid from (select expand(in()) from (select expand(in().in().in()) from (select from Data where dataID='%s')) where @class='DeleteNode')), $j = (select @rid from (select expand(in()) from (select expand(in().in()) from (select from Data where dataID='%s')) where @class='DeleteNode')), $k = (select @rid from (select expand(in()) from (select expand(in()) from (select from Data where dataID='%s')) where @class='DeleteNode')), $l = unionall($h, $i, $j, $k))",dataID,dataID,dataID,dataID);
+    printf("SQL: %s\n",sql);
+    
+    char** dup_rid = getArrayDistinctRid(sql);
+    
     if(dup_rid!=NULL){
+        //  show duplicate rid
         for(i=0;dup_rid[i]!=NULL;i++)
             printf("dup_rid[%d]: %s\n",i,dup_rid[i]);
-        
+        // filter rid
         for(i=0;dup_rid[i]!=NULL;i++){
             for(j=0;result_rid[j]!=NULL;j++){
                 if(strcmp(result_rid[j],dup_rid[i])==0){
@@ -2268,14 +2356,339 @@ Data** queryDataFromData(char* dataID, int dType){
         printf("no dup_id\n");
 
     }
-
+    
+    int count=0;
+    //  show filtered id
     for(j=0;result_rid[j]!=NULL;j++){
-        if(result_rid[j]!="-"){
+        if(strcmp(result_rid[j],"-")!=0){
             printf("filter_rid: %s\n",result_rid[j]);
+            count++;
         }
     }
+    printf("\nnum(distinct+filter): %d\n",count);
+    if(count==0){
+        printf("no result_rid\n");
+        return NULL;
+    }
     
-    return NULL;
+    Data** dt = (Data**)malloc(sizeof(Data*)*(count+1));
+    for(i=0;i<count;i++){
+        dt[i] = (Data*)malloc(sizeof(Data));
+    }
+    for(j=0;result_rid[j]!=NULL;j++){
+        if(strcmp(result_rid[j],"-")!=0){
+            dt[j] = queryDataByRid(result_rid[j]);
+        }
+    }
+    printf("j: %d\n",j);
+    dt[j]=NULL;
+    
+    return dt;
+//    return NULL;
+}
+                          
+Data* queryDataByRid(char* rid){
+    char sql[MAX_SQL_SIZE];
+    char* token;
+    
+    //  Data
+    Data* dt = (Data*)malloc(sizeof(Data));
+    printf("--------------------------------------------------[get_info_Data]\n");
+    sprintf(sql,"SELECT dataID,dataName,dataType,chatRoom from %s",rid);
+    printf("SQL: %s\n",sql);
+    char* result = getContent(sql);
+    
+    if(result==NULL){
+        return NULL;
+    }
+    printf("result: %s\n\n\n\n\n",result);
+    printf("--- Data ---\n");
+    
+    token = strtok(result,"\"");
+    token = strtok(NULL,"\"");
+    printf("dataID: %s\n",token);
+    dt->dataID = strdup(token);
+    
+    
+    token = strtok(NULL,"\"");
+    token = strtok(NULL,"\"");
+    printf("dataName: %s\n",token);
+    dt->dataName = strdup(token);
+    
+    token = strtok(NULL,":");
+    token = strtok(NULL,",");
+    printf("dataType: %s\n",token);
+    dt->dataType = atoi(token);
+    
+    token = strtok(NULL,"\"");
+//    printf("tk: %s\n",token);
+    if(token!=NULL){
+        token = strtok(NULL,"\"");
+//        printf("tk: %s\n",token);
+        printf("chatRoom: %s\n\n",token);
+        dt->chatRoom = strdup(token);
+    }
+    
+    free(result);
+    
+    //  DataHolder
+    DataHolder* dh = (DataHolder*)malloc(sizeof(DataHolder));
+    dt->content = dh;
+    printf("--------------------------------------------------[get_info_DataHolder]\n");
+    sprintf(sql,"SELECT @rid,versionKeeped from (select expand(out('toDataHolder')) from %s)",rid);
+    printf("SQL: %s\n",sql);
+    result = getContent(sql);
+    
+    if(result==NULL){
+        return NULL;
+    }
+    printf("result: %s\n\n\n\n\n",result);
+    printf("--- DataHolder ---\n");
+    
+    token = strtok(result,":");
+    token = strtok(NULL,",");
+    printf("dh_@rid: %s\n",token);
+    char* rid_dh = strdup(token);
+    
+    token = strtok(NULL,":");
+    token = strtok(NULL,",");
+    printf("versionKeeped: %s\n\n",token);
+    dh->versionKeeped = atoi(token);
+    dh->head = NULL;
+    dh->lastestCommon = NULL;
+    dh->current = NULL;
+    
+    free(result);
+    
+    //  count DataContent
+    printf("--------------------------------------------------[get_count_DataContent]\n");
+    sprintf(sql,"select count(*) from (select expand(in('toDataHolder_fromDC')) from %s)",rid_dh);
+    printf("SQL: %s\n",sql);
+    result = getContent(sql);
+    
+    if(result==NULL){
+        return NULL;
+    }
+    printf("result: %s\n\n\n\n\n",result);
+    token = strtok(result,":");
+    token = strtok(NULL,"l");
+    printf("count: %s\n\n",token);
+    int count = atoi(token);
+    
+    free(result);
+    
+    DataContent* dc[count];
+    int i;
+    for(i=0;i<count;i++){
+        dc[i] = (DataContent*)malloc(sizeof(DataContent));
+    }
+    dh->head = dc[count-1];
+    dh->lastestCommon = dc[0];
+    dh->current = dc[count-1];
+    
+    
+    //  next/pre/dataHd
+    //  isDiff SHA256hashCode timeStamp(NULL) minus/plus/full
+    
+    //  DataContent
+    printf("--------------------------------------------------[get_DataContent]\n");
+    sprintf(sql,"select isDiff,SHA256hashCode,timeStamp,plus_schemaCode,plus_byteCount,plus_data,minus_schemaCode,minus_byteCount,minus_data,full_schemaCode,full_byteCount,full_data from (select expand(in('toDataHolder_fromDC')) from %s)",rid_dh);
+    printf("SQL: %s\n",sql);
+    result = getContent(sql);
+    
+    if(result==NULL){
+        return NULL;
+    }
+    printf("result: %s\n\n\n\n\n",result);
+    
+    string init;
+    init.assign(result);
+    printf("before: %s\n",result);
+    string res = replace(init,"\\'","'");
+    res = replace(res,"\\\"","\"");
+    printf("\n------------------------------------------------------------------------------------------------------------\n\n");
+    printf("replace: %s\n",res.c_str());
+    printf("\n------------------------------------------------------------------------------------------------------------\n\n");
+    
+    free(result);
+    result = strdup(res.c_str());
+    
+    char* tmp_tok = strtok(result,"#");
+    char **dc_str = (char**)malloc(sizeof(char*)*count);
+    
+    for(i=0;i<count;i++){
+        printf("--- DataContent[%d] ---\n",i);
+        printf("tmp_tok: %s\n",tmp_tok);
+        //        printf("len: %d\n",strlen(tmp_tok));
+        
+        dc_str[i]= strdup(tmp_tok);
+        printf("\ndc_str: %s\n",dc_str[i]);
+        
+        dc[i]->timeStamp = NULL;
+        dc[i]->minusPatch = NULL;
+        dc[i]->plusPatch = NULL;
+        dc[i]->fullContent = NULL;
+        dc[i]->dataHd = dh;
+        
+        if(i!=0){
+            dc[i]->preVersion = dc[i-1];
+        }
+        if(i!=count-1){
+            dc[i]->nextVersion = dc[i+1];
+        }
+        
+        tmp_tok = strtok(NULL, "#");
+    }
+    free(result);
+    
+    char* br;
+    char* pt_data;
+    
+    for(i=0;i<count;i++){
+        printf("\n[%d]\n",i);
+        
+        //  isDiff
+        token = strtok_r(dc_str[i],":",&br);
+        token = strtok_r(NULL,",",&br);
+        printf("isDiff: %s\n",token);
+        
+        if(strcmp(token,"true")==0){
+            dc[i]->isDiff = TRUE;
+        }
+        else{
+            dc[i]->isDiff = FALSE;
+        }
+        
+        //  SHA256hashCode
+        token = strtok_r(NULL,"\"",&br);
+        token = strtok_r(NULL,"\"",&br);
+        printf("SHA256hashCode: %s\n",token);
+        dc[i]->SHA256hashCode = strdup(token);
+        
+        //  timeStamp(NULL)
+        
+        //  minusPatch/plusPatch/fullContent
+        result = br+1;
+        printf("result: %s\n",result);
+        token = strtok_r(result, ":", &br);
+        
+        while(token!=NULL){
+            printf("key: %s\n",token);
+            if(token == NULL)
+                break;
+            if(strcmp(token,"minus_schemaCode")==0){
+                printf("\n[minus]\n");
+                dc[i]->minusPatch = (ObjectBinary*)malloc(sizeof(ObjectBinary));
+                
+                //  schemaCode
+                token = strtok_r(NULL,",",&br);
+                printf("schemaCode: %s\n",token);
+                dc[i]->minusPatch->schemaCode = atoi(token);
+                
+                //  byteCount
+                token = strtok_r(NULL,":",&br);
+                token = strtok_r(NULL,",",&br);
+                printf("bytecount: %s\n",token);
+                dc[i]->minusPatch->byteCount = atoi(token);
+                
+                printf("br: %s\n",br);
+                pt_data = br+12;
+                
+                int b_count = atoi(token);
+                dc[i]->minusPatch->data = (char*)calloc(b_count+1,sizeof(char));
+                memcpy(dc[i]->minusPatch->data,pt_data,b_count);
+                printf("dc_data: %s\n",dc[i]->minusPatch->data);
+                //                strcat(dc[i]->minusPatch->data,"1");
+                //                printf("len: %d\n",strlen(dc[i]->minusPatch->data));
+                //                printf("--- %c\n",dc[i]->minusPatch->data[b_count]);
+                pt_data = br+12+b_count+1;
+                if(pt_data[0] == '\0'){
+                    printf("data is NULL\n");
+                    break;
+                }
+                else{
+                    pt_data = br+11+b_count+2;
+                    printf("pt_data: %s\n",pt_data);
+                    token = strtok_r(pt_data,":",&br);
+                }
+            }
+            //            token = NULL;
+            else if(strcmp(token,"plus_schemaCode")==0){
+                printf("\n[plus]\n");
+                dc[i]->plusPatch = (ObjectBinary*)malloc(sizeof(ObjectBinary));
+                
+                //  schemaCode
+                token = strtok_r(NULL,",",&br);
+                printf("schemaCode: %s\n",token);
+                dc[i]->plusPatch->schemaCode = atoi(token);
+                
+                //  byteCount
+                token = strtok_r(NULL,":",&br);
+                token = strtok_r(NULL,",",&br);
+                printf("bytecount: %s\n",token);
+                dc[i]->plusPatch->byteCount = atoi(token);
+                
+                printf("br: %s\n",br);
+                pt_data = br+11;
+                printf("pt_data: %s\n",pt_data);
+                
+                int b_count = atoi(token);
+                printf("b_count: %d\n",b_count);
+                
+                dc[i]->plusPatch->data = (char*)calloc(b_count+1,sizeof(char));
+                memcpy(dc[i]->plusPatch->data,pt_data,b_count);
+                printf("dc_data: %s\n",dc[i]->plusPatch->data);
+                pt_data = br+11+b_count+1;
+                if(pt_data[0] == '\0'){
+                    printf("data is NULL\n");
+                    break;
+                }
+                else{
+                    pt_data = br+11+b_count+2;
+                    printf("pt_data: %s\n",pt_data);
+                    token = strtok_r(pt_data,":",&br);
+                }
+            }
+            //            if(strcmp(token,"full_schemaCode")==0){
+            else{
+                printf("\n[full]\n");
+                dc[i]->fullContent = (ObjectBinary*)malloc(sizeof(ObjectBinary));
+                
+                //  schemaCode
+                token = strtok_r(NULL,",",&br);
+                printf("schemaCode: %s\n",token);
+                dc[i]->fullContent->schemaCode = atoi(token);
+                
+                //  byteCount
+                token = strtok_r(NULL,":",&br);
+                token = strtok_r(NULL,",",&br);
+                printf("bytecount: %s\n",token);
+                dc[i]->fullContent->byteCount = atoi(token);
+                
+                printf("br: %s\n",br);
+                pt_data = br+11;
+                printf("pt_data: %s\n",pt_data);
+                
+                int b_count = atoi(token);
+                printf("b_count: %d\n",b_count);
+                
+                dc[i]->fullContent->data = (char*)calloc(b_count+1,sizeof(char));
+                memcpy(dc[i]->fullContent->data,pt_data,b_count);
+                printf("dc_data: %s\n",dc[i]->fullContent->data);
+                pt_data = br+11+b_count+1;
+                if(pt_data[0] == '\0'){
+                    printf("data is NULL\n");
+                    break;
+                }
+                else{
+                    pt_data = br+11+b_count+2;
+                    printf("pt_data: %s\n",pt_data);
+                }
+            }
+        }
+        free(dc_str[i]);
+    }
+    return dt;
 }
 
 Data* queryDataByID(char* dataID){
@@ -2309,9 +2722,12 @@ Data* queryDataByID(char* dataID){
     token = strtok(NULL,":");
     token = strtok(NULL,",");
     printf("dataType: %s\n",token);
+    dt->dataType = atoi(token);
+    
     token = strtok(NULL,"\"");
     token = strtok(NULL,"\"");
     printf("chatRoom: %s\n\n",token);
+    dt->chatRoom = strdup(token);
 
     free(result);
     
@@ -2344,7 +2760,7 @@ Data* queryDataByID(char* dataID){
     
     free(result);
     
-    //  DataContent
+    //  count DataContent
     printf("--------------------------------------------------[get_count_DataContent]\n");
     sprintf(sql,"select count(*) from (select expand(in('toDataHolder_fromDC')) from %s)",rid_dh);
     printf("SQL: %s\n",sql);
@@ -2366,9 +2782,16 @@ Data* queryDataByID(char* dataID){
     for(i=0;i<count;i++){
         dc[i] = (DataContent*)malloc(sizeof(DataContent));
     }
+    dh->head = dc[count-1];
+    dh->lastestCommon = dc[0];
+    dh->current = dc[count-1];
     
-    //  next/pre/dataHd SHA256hashCode timeStamp = NULL plus/minus/full isDiff
     
+    //  next/pre/dataHd
+    //  isDiff SHA256hashCode timeStamp(NULL) minus/plus/full
+    
+    //  DataContent
+    printf("--------------------------------------------------[get_DataContent]\n");
     sprintf(sql,"select isDiff,SHA256hashCode,timeStamp,plus_schemaCode,plus_byteCount,plus_data,minus_schemaCode,minus_byteCount,minus_data,full_schemaCode,full_byteCount,full_data from (select expand(in('toDataHolder_fromDC')) from %s)",rid_dh);
     printf("SQL: %s\n",sql);
     result = getContent(sql);
@@ -2387,6 +2810,7 @@ Data* queryDataByID(char* dataID){
     printf("replace: %s\n",res.c_str());
     printf("\n------------------------------------------------------------------------------------------------------------\n\n");
     
+    free(result);
     result = strdup(res.c_str());
     
     char* tmp_tok = strtok(result,"#");
@@ -2415,29 +2839,6 @@ Data* queryDataByID(char* dataID){
         
         tmp_tok = strtok(NULL, "#");
     }
-    
-    //        char test[64] = "abc 123";
-    //        char abc[6];
-    //        int num;
-    //        sscanf(test, "%s %d", abc, &num);
-    //        printf("t: '%s' '%d'\n", abc, num);
-    
-//    char test[80], blah[80];
-//    char *sep = "\\/:;=-";
-//    char *word, *phrase, *brkt, *brkb;
-//    
-//    strcpy(test, "This;is.a:test:of=the/string\\tokenizer-function.");
-//    
-//    for (word = strtok_r(test, sep, &brkt);word;word = strtok_r(NULL, sep, &brkt)){
-//        strcpy(blah, "blah:blat:blab:blag");
-//        
-//        for (phrase = strtok_r(blah, sep, &brkb);phrase;phrase = strtok_r(NULL, sep, &brkb)){
-//            printf("So far we're at %s:%s\n", word, phrase);
-//            printf("%s\t%s\n",brkt,brkb);
-//            brkt = brkt+10;
-//            printf("%s\n",brkt);
-//        }
-//    }
     free(result);
 
     char* br;
@@ -2445,22 +2846,30 @@ Data* queryDataByID(char* dataID){
 
     for(i=0;i<count;i++){
         printf("\n[%d]\n",i);
-
+        
+        //  isDiff
         token = strtok_r(dc_str[i],":",&br);
         token = strtok_r(NULL,",",&br);
         printf("isDiff: %s\n",token);
         
+        if(strcmp(token,"true")==0){
+            dc[i]->isDiff = TRUE;
+        }
+        else{
+            dc[i]->isDiff = FALSE;
+        }
+
+        //  SHA256hashCode
         token = strtok_r(NULL,"\"",&br);
         token = strtok_r(NULL,"\"",&br);
         printf("SHA256hashCode: %s\n",token);
+        dc[i]->SHA256hashCode = strdup(token);
         
-//        free(result);
+        //  timeStamp(NULL)
+        
+        //  minusPatch/plusPatch/fullContent
         result = br+1;
         printf("result: %s\n",result);
-//        result = strdup(br+1);
-//        char* tt = strdup(br+1);
-//        printf("tt: %s\n",tt);
-//        token = strtok_r(tt,":",&br);
         token = strtok_r(result, ":", &br);
         
         while(token!=NULL){
@@ -2469,30 +2878,36 @@ Data* queryDataByID(char* dataID){
                 break;
             if(strcmp(token,"minus_schemaCode")==0){
                 printf("\n[minus]\n");
+                dc[i]->minusPatch = (ObjectBinary*)malloc(sizeof(ObjectBinary));
+                
+                //  schemaCode
                 token = strtok_r(NULL,",",&br);
                 printf("schemaCode: %s\n",token);
-
+                dc[i]->minusPatch->schemaCode = atoi(token);
+                
+                //  byteCount
                 token = strtok_r(NULL,":",&br);
                 token = strtok_r(NULL,",",&br);
                 printf("bytecount: %s\n",token);
+                dc[i]->minusPatch->byteCount = atoi(token);
+                
                 printf("br: %s\n",br);
                 pt_data = br+12;
                 
-                int count = atoi(token);
-                dc[i]->minusPatch = (ObjectBinary*)malloc(sizeof(ObjectBinary));
-                dc[i]->minusPatch->data = (char*)calloc(count+1,sizeof(char));
-                memcpy(dc[i]->minusPatch->data,pt_data,count);
+                int b_count = atoi(token);
+                dc[i]->minusPatch->data = (char*)calloc(b_count+1,sizeof(char));
+                memcpy(dc[i]->minusPatch->data,pt_data,b_count);
                 printf("dc_data: %s\n",dc[i]->minusPatch->data);
 //                strcat(dc[i]->minusPatch->data,"1");
 //                printf("len: %d\n",strlen(dc[i]->minusPatch->data));
-//                printf("--- %c\n",dc[i]->minusPatch->data[count]);
-                pt_data = br+12+count+1;
+//                printf("--- %c\n",dc[i]->minusPatch->data[b_count]);
+                pt_data = br+12+b_count+1;
                 if(pt_data[0] == '\0'){
                     printf("data is NULL\n");
                     break;
                 }
                 else{
-                    pt_data = br+11+count+2;
+                    pt_data = br+11+b_count+2;
                     printf("pt_data: %s\n",pt_data);
                     token = strtok_r(pt_data,":",&br);
                 }
@@ -2500,31 +2915,36 @@ Data* queryDataByID(char* dataID){
 //            token = NULL;
             else if(strcmp(token,"plus_schemaCode")==0){
                 printf("\n[plus]\n");
+                dc[i]->plusPatch = (ObjectBinary*)malloc(sizeof(ObjectBinary));
+                
+                //  schemaCode
                 token = strtok_r(NULL,",",&br);
                 printf("schemaCode: %s\n",token);
+                dc[i]->plusPatch->schemaCode = atoi(token);
                 
+                //  byteCount
                 token = strtok_r(NULL,":",&br);
                 token = strtok_r(NULL,",",&br);
                 printf("bytecount: %s\n",token);
+                dc[i]->plusPatch->byteCount = atoi(token);
+                
                 printf("br: %s\n",br);
                 pt_data = br+11;
                 printf("pt_data: %s\n",pt_data);
                 
-                int count = atoi(token);
-                printf("count: %d\n",count);
-                dc[i]->plusPatch = (ObjectBinary*)malloc(sizeof(ObjectBinary));
-                dc[i]->plusPatch->data = (char*)calloc(count+1,sizeof(char));
-                memcpy(dc[i]->plusPatch->data,pt_data,count);
+                int b_count = atoi(token);
+                printf("b_count: %d\n",b_count);
+                
+                dc[i]->plusPatch->data = (char*)calloc(b_count+1,sizeof(char));
+                memcpy(dc[i]->plusPatch->data,pt_data,b_count);
                 printf("dc_data: %s\n",dc[i]->plusPatch->data);
-//                printf("len: %d\n",strlen(dc[i]->plusPatch->data));
-//                printf("--- %c\n",dc[i]->plusPatch->data[count-2]);
-                pt_data = br+11+count+1;
+                pt_data = br+11+b_count+1;
                 if(pt_data[0] == '\0'){
                     printf("data is NULL\n");
                     break;
                 }
                 else{
-                    pt_data = br+11+count+2;
+                    pt_data = br+11+b_count+2;
                     printf("pt_data: %s\n",pt_data);
                     token = strtok_r(pt_data,":",&br);
                 }
@@ -2532,37 +2952,43 @@ Data* queryDataByID(char* dataID){
 //            if(strcmp(token,"full_schemaCode")==0){
             else{
                 printf("\n[full]\n");
+                dc[i]->fullContent = (ObjectBinary*)malloc(sizeof(ObjectBinary));
+                
+                //  schemaCode
                 token = strtok_r(NULL,",",&br);
                 printf("schemaCode: %s\n",token);
+                dc[i]->fullContent->schemaCode = atoi(token);
                 
+                //  byteCount
                 token = strtok_r(NULL,":",&br);
                 token = strtok_r(NULL,",",&br);
                 printf("bytecount: %s\n",token);
+                dc[i]->fullContent->byteCount = atoi(token);
+                
                 printf("br: %s\n",br);
                 pt_data = br+11;
                 printf("pt_data: %s\n",pt_data);
                 
-                int count = atoi(token);
-                printf("count: %d\n",count);
-                dc[i]->fullContent = (ObjectBinary*)malloc(sizeof(ObjectBinary));
-                dc[i]->fullContent->data = (char*)calloc(count+1,sizeof(char));
-                memcpy(dc[i]->fullContent->data,pt_data,count);
-                printf("dc_data: %s\n",dc[i]->fullContent->data);
+                int b_count = atoi(token);
+                printf("b_count: %d\n",b_count);
                 
-                pt_data = br+11+count+1;
+                dc[i]->fullContent->data = (char*)calloc(b_count+1,sizeof(char));
+                memcpy(dc[i]->fullContent->data,pt_data,b_count);
+                printf("dc_data: %s\n",dc[i]->fullContent->data);
+                pt_data = br+11+b_count+1;
                 if(pt_data[0] == '\0'){
                     printf("data is NULL\n");
                     break;
                 }
                 else{
-                    pt_data = br+11+count+2;
+                    pt_data = br+11+b_count+2;
                     printf("pt_data: %s\n",pt_data);
                 }
             }
         }
         free(dc_str[i]);
     }
-    return NULL;
+    return dt;
 }
 
 t_bool isObjectOwnedByUser(char* userID, char* objID){
@@ -2677,7 +3103,7 @@ void test_setNewData(){
     setNewDataDiffWithTag(_mydata, "price", NULL, diff_price);
     setNewDataDiffWithTag(_mydata, "titel", NULL, "hello");
     
-    setDataName(_mydata, "mySubTask2");
+    setDataName(_mydata, "myTask2");
     printf("dataName: %s\n",_mydata->dataName);
     setChatRoom(_mydata, "chat-room");
     printf("chatRoom: %s\n",_mydata->chatRoom);
@@ -2891,7 +3317,7 @@ void testCRUD(Data** data){
 */
     
     Data* dt = *data;
-//    addData2Data("E4DEA39D5E7646918E07B414C2CC0671",dt,_toSubTask);
+//    addData2Data("A1C49651099946C7B2F9CD0B70092797",dt,_toTask);
     
 //    setDataNameByID("A99B27E341CA424D84FADCCB5B856910","Tanapon");
 //    setChatRoomByID("A99B27E341CA424D84FADCCB5B856910", "chat-room2");
@@ -2905,15 +3331,14 @@ void testCRUD(Data** data){
     printf("res2: %s\n",res2);
 */
     
-    char sql3[]="select expand($c) let $a = (select @rid from (select expand(in().in().in()) from (select from Data where dataID='27932585089147AAB22BD2C59E2DBD4B')) where dataType=5), $b = (select @rid from (select expand(in().in()) from (select from Data where dataID='27932585089147AAB22BD2C59E2DBD4B')) where dataType=5), $c = unionall($a, $b)";
+//    char** tmp = getArrayRid("select @rid from Data");
+//    queryDataFromData("C27C43B2CDD74AADB9A9096EFFCFB7BE", _user);
     
-    char sql4[] ="select expand($f) let $a = (select @rid from (select expand(in().in().in().in().in()) from (select from Data where dataID='27932585089147AAB22BD2C59E2DBD4B')) where dataType=5), $b = (select @rid from (select expand(in().in().in().in()) from (select from Data where dataID='27932585089147AAB22BD2C59E2DBD4B')) where dataType=5), $c = (select @rid from (select expand(in().in().in()) from (select from Data where dataID='27932585089147AAB22BD2C59E2DBD4B')) where dataType=5), $d = (select @rid from (select expand(in().in()) from (select from Data where dataID='27932585089147AAB22BD2C59E2DBD4B')) where dataType=5), $e = (select @rid from (select expand(in()) from (select from Data where dataID='27932585089147AAB22BD2C59E2DBD4B')) where dataType=5), $f = unionall($a, $b, $c, $d, $e)";
-//    char* result = getContent(sql3);
-//    printf("result:%s\n",result);
-    
-//    char** result_rid = getArrayRid(sql4);
-    
-//    queryDataFromData("15F8C836874B4BD0AAA560B8807618AE", _user);
+//    Data** arr_dt = queryDataFromData("E4DEA39D5E7646918E07B414C2CC0671", _user);
+    int i;
+//    for(i=0;arr_dt[i]!=NULL;i++){
+//        printf("arrdt[%d]: %s\n",i,arr_dt[i]->dataName);
+//    }
     
     //  test-Category --> myState2 ??
     isObjectUnderData("2603169373904B9FBF05F72620D70F3D","A1C49651099946C7B2F9CD0B70092797");
@@ -2923,9 +3348,44 @@ void testCRUD(Data** data){
 //    const char* uuid_org = createOrg("Throughwave",test_schema);
 //    addUser2OrgByID((char*)uuid_org,"A99B27E341CA424D84FADCCB5B856910");
     
-    queryDataByID("AB461924401F4B98B3DBB183CA9FEA50");
-//    deleteObj("A99B27E341CA424D84FADCCB5B856910","2CE74EB7700A4D919D7027B82743E977", "7981CF1C2B624DB19D8EF7D761A5FF55");
+    Data* q_data = queryDataByID("AB461924401F4B98B3DBB183CA9FEA50");
     
+    printf("\n--- query Data ---\n");
+    printf("dataID: %s\n", q_data->dataID);
+    printf("dataName: %s\n", q_data->dataName);
+    printf("dataType: %d\n", q_data->dataType);
+    printf("chatRoom: %s\n", q_data->chatRoom);
+    printf("versionKeeped: %d\n", q_data->content->versionKeeped);
+    
+    printf("head: %s\n", q_data->content->head->fullContent->data);
+    printf("last: %s\n", q_data->content->lastestCommon->minusPatch->data);
+    int count_dc = countDataContent(q_data);
+    printf("count_dc: %d\n",count_dc);
+    
+    
+    for(i=0;i<count_dc-1;i++){
+        ObjectBinary* obj_nv = getContentNextVer(q_data);
+        if(obj_nv != NULL){
+            printf("schemaCode_nv: %d\n",obj_nv->schemaCode);
+            printf("byteCount_nv: %d\n",obj_nv->byteCount);
+            printf("data_nv: %s\n",obj_nv->data);
+            free(obj_nv->data);
+            free(obj_nv);
+            
+        }
+        if(i != count_dc-1)
+            q_data->content->current = q_data->content->current->preVersion;
+    }
+    
+//    addState2CategoryByID("2603169373904B9FBF05F72620D70F3D", "C27C43B2CDD74AADB9A9096EFFCFB7BE");
+//    addTask2StateByID("A1C49651099946C7B2F9CD0B70092797", "4EC579D4402740A19D1DADA9542D38E5");
+    
+    //  test-Category -x-> myState
+//    deleteObj("8B8462EC0C8A4519B05A9D9DB788F13F","2603169373904B9FBF05F72620D70F3D", "C27C43B2CDD74AADB9A9096EFFCFB7BE");
+    //  myState2 -x-> myTask2
+//    deleteObj("8B8462EC0C8A4519B05A9D9DB788F13F","A1C49651099946C7B2F9CD0B70092797", "4EC579D4402740A19D1DADA9542D38E5");
+    
+//    flushTrash("8B8462EC0C8A4519B05A9D9DB788F13F");
     
     disconnectServer();
     close(Sockfd);
