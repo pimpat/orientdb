@@ -843,26 +843,37 @@ char* getContent(char *query) {
         return NULL;
     
     char* str = (char*)malloc(sizeof(char)*MAX_CONTENT_SIZE);
-    char* all_str = (char*)malloc(sizeof(char)*MAX_CONTENT_SIZE);
-    for(i=0;i<total;i++){
-    read(Sockfd, &size, 4);
-    swapEndian(&size, INT);
-    printf("size: %d\n",size);
-    read(Sockfd, str, size);
-    str[size]='\0';
-        strcat(all_str,"#");
-        strcat(all_str,str);
-    printf("msg: %s\n",str);
-    read(Sockfd, &GPacket.msg, 2+1+2+8+4);
-    printf("[result from getContent]---------------\n",i);
+    if(total==1){
+        for(i=0;i<total;i++){
+            read(Sockfd, &size, 4);
+            swapEndian(&size, INT);
+            printf("size: %d\n",size);
+            read(Sockfd, str, size);
+            str[size]='\0';
+            printf("msg: %s\n",str);
+            read(Sockfd, &GPacket.msg, 2+1+2+8+4);
+            printf("[result from getContent]---------------\n",i);
+        }
+        return str;
     }
-    
-    if(total>1){
+    else{
+        char* all_str = (char*)malloc(sizeof(char)*MAX_CONTENT_SIZE);
+        for(i=0;i<total;i++){
+            read(Sockfd, &size, 4);
+            swapEndian(&size, INT);
+            printf("size: %d\n",size);
+            read(Sockfd, str, size);
+            str[size]='\0';
+            strcat(all_str,"#");
+            strcat(all_str,str);
+            printf("msg: %s\n",str);
+            read(Sockfd, &GPacket.msg, 2+1+2+8+4);
+            printf("[result from getContent]---------------\n",i);
+        }
+        free(str);
         printf("all_str(len): %d\n",strlen(all_str));
         return all_str;
     }
-    else
-        return str;
 }
 
 char** getArrayRid(char* query){
@@ -1028,6 +1039,14 @@ ObjectBinary* createNewObjBinary(char* data){
 }
 
 int countDataContent(Data* data){
+//    DataContent *dc = (DataContent*)malloc(sizeof(DataContent));
+//    DataContent *next = (DataContent*)malloc(sizeof(DataContent));
+//    int i=1;
+//    for(dc = data->content->lastestCommon;dc!=NULL;dc=next){
+//        i++;
+//        next = dc->nextVersion;
+//    }
+    printf("\n'countDataContent'\n");
     DataContent* dc = data->content->lastestCommon;
     int i=1;
     while(dc!=NULL){
@@ -2392,7 +2411,6 @@ Data* queryDataByRid(char* rid){
     char* token;
     
     //  Data
-    Data* dt = (Data*)malloc(sizeof(Data));
     printf("--------------------------------------------------[get_info_Data]\n");
     sprintf(sql,"SELECT dataID,dataName,dataType,chatRoom from %s",rid);
     printf("SQL: %s\n",sql);
@@ -2403,12 +2421,12 @@ Data* queryDataByRid(char* rid){
     }
     printf("result: %s\n\n\n\n\n",result);
     printf("--- Data ---\n");
+    Data* dt = (Data*)malloc(sizeof(Data));
     
     token = strtok(result,"\"");
     token = strtok(NULL,"\"");
     printf("dataID: %s\n",token);
     dt->dataID = strdup(token);
-    
     
     token = strtok(NULL,"\"");
     token = strtok(NULL,"\"");
@@ -2421,10 +2439,8 @@ Data* queryDataByRid(char* rid){
     dt->dataType = atoi(token);
     
     token = strtok(NULL,"\"");
-//    printf("tk: %s\n",token);
     if(token!=NULL){
         token = strtok(NULL,"\"");
-//        printf("tk: %s\n",token);
         printf("chatRoom: %s\n\n",token);
         dt->chatRoom = strdup(token);
     }
@@ -2432,18 +2448,23 @@ Data* queryDataByRid(char* rid){
     free(result);
     
     //  DataHolder
-    DataHolder* dh = (DataHolder*)malloc(sizeof(DataHolder));
-    dt->content = dh;
     printf("--------------------------------------------------[get_info_DataHolder]\n");
     sprintf(sql,"SELECT @rid,versionKeeped from (select expand(out('toDataHolder')) from %s)",rid);
     printf("SQL: %s\n",sql);
     result = getContent(sql);
     
     if(result==NULL){
+        free((char*)dt->dataID);
+        free(dt->dataName);
+        if(dt->chatRoom != NULL)
+            free(dt->chatRoom);
+        free(dt);
         return NULL;
     }
     printf("result: %s\n\n\n\n\n",result);
     printf("--- DataHolder ---\n");
+    DataHolder* dh = (DataHolder*)malloc(sizeof(DataHolder));
+    dt->content = dh;
     
     token = strtok(result,":");
     token = strtok(NULL,",");
@@ -2467,6 +2488,13 @@ Data* queryDataByRid(char* rid){
     result = getContent(sql);
     
     if(result==NULL){
+        free(rid_dh);
+        free(dh);
+        free((char*)dt->dataID);
+        free(dt->dataName);
+        if(dt->chatRoom != NULL)
+            free(dt->chatRoom);
+        free(dt);
         return NULL;
     }
     printf("result: %s\n\n\n\n\n",result);
@@ -2476,16 +2504,6 @@ Data* queryDataByRid(char* rid){
     int count = atoi(token);
     
     free(result);
-    
-    DataContent* dc[count];
-    int i;
-    for(i=0;i<count;i++){
-        dc[i] = (DataContent*)malloc(sizeof(DataContent));
-    }
-    dh->head = dc[count-1];
-    dh->lastestCommon = dc[0];
-    dh->current = dc[count-1];
-    
     
     //  next/pre/dataHd
     //  isDiff SHA256hashCode timeStamp(NULL) minus/plus/full
@@ -2497,9 +2515,25 @@ Data* queryDataByRid(char* rid){
     result = getContent(sql);
     
     if(result==NULL){
+        free(rid_dh);
+        free(dh);
+        free((char*)dt->dataID);
+        free(dt->dataName);
+        if(dt->chatRoom != NULL)
+            free(dt->chatRoom);
+        free(dt);
         return NULL;
     }
     printf("result: %s\n\n\n\n\n",result);
+    DataContent** dc = (DataContent**)malloc(sizeof(DataContent*)*(count+1));
+    int i;
+    for(i=0;i<count;i++){
+        dc[i] = (DataContent*)malloc(sizeof(DataContent));
+    }
+    dh->head = dc[count-1];
+    dh->lastestCommon = dc[0];
+    dh->current = dc[count-1];
+    dc[count] = NULL;
     
     string init;
     init.assign(result);
@@ -2688,6 +2722,9 @@ Data* queryDataByRid(char* rid){
         }
         free(dc_str[i]);
     }
+    free(rid_dh);
+    free(dc_str);
+    free(dc);
     return dt;
 }
 
@@ -2696,7 +2733,6 @@ Data* queryDataByID(char* dataID){
     char* token;
     
     //  Data
-    Data* dt = (Data*)malloc(sizeof(Data));
     printf("--------------------------------------------------[get_info_Data]\n");
     sprintf(sql,"SELECT dataID,dataName,dataType,chatRoom from Data where dataID='%s'",dataID);
     printf("SQL: %s\n",sql);
@@ -2707,12 +2743,12 @@ Data* queryDataByID(char* dataID){
     }
     printf("result: %s\n\n\n\n\n",result);
     printf("--- Data ---\n");
+    Data* dt = (Data*)malloc(sizeof(Data));
     
     token = strtok(result,"\"");
     token = strtok(NULL,"\"");
     printf("dataID: %s\n",token);
     dt->dataID = strdup(token);
-    
     
     token = strtok(NULL,"\"");
     token = strtok(NULL,"\"");
@@ -2732,18 +2768,22 @@ Data* queryDataByID(char* dataID){
     free(result);
     
     //  DataHolder
-    DataHolder* dh = (DataHolder*)malloc(sizeof(DataHolder));
-    dt->content = dh;
     printf("--------------------------------------------------[get_info_DataHolder]\n");
     sprintf(sql,"SELECT @rid,versionKeeped from (select expand(out('toDataHolder')) from Data where dataID='%s')",dataID);
     printf("SQL: %s\n",sql);
     result = getContent(sql);
     
     if(result==NULL){
+        free((char*)dt->dataID);
+        free(dt->dataName);
+        free(dt->chatRoom);
+        free(dt);
         return NULL;
     }
     printf("result: %s\n\n\n\n\n",result);
     printf("--- DataHolder ---\n");
+    DataHolder* dh = (DataHolder*)malloc(sizeof(DataHolder));
+    dt->content = dh;
     
     token = strtok(result,":");
     token = strtok(NULL,",");
@@ -2767,6 +2807,12 @@ Data* queryDataByID(char* dataID){
     result = getContent(sql);
     
     if(result==NULL){
+        free(rid_dh);
+        free(dh);
+        free((char*)dt->dataID);
+        free(dt->dataName);
+        free(dt->chatRoom);
+        free(dt);
         return NULL;
     }
     printf("result: %s\n\n\n\n\n",result);
@@ -2776,16 +2822,6 @@ Data* queryDataByID(char* dataID){
     int count = atoi(token);
     
     free(result);
-    
-    DataContent* dc[count];
-    int i;
-    for(i=0;i<count;i++){
-        dc[i] = (DataContent*)malloc(sizeof(DataContent));
-    }
-    dh->head = dc[count-1];
-    dh->lastestCommon = dc[0];
-    dh->current = dc[count-1];
-    
     
     //  next/pre/dataHd
     //  isDiff SHA256hashCode timeStamp(NULL) minus/plus/full
@@ -2797,9 +2833,24 @@ Data* queryDataByID(char* dataID){
     result = getContent(sql);
     
     if(result==NULL){
+        free(rid_dh);
+        free(dh);
+        free((char*)dt->dataID);
+        free(dt->dataName);
+        free(dt->chatRoom);
+        free(dt);
         return NULL;
     }
     printf("result: %s\n\n\n\n\n",result);
+    DataContent** dc = (DataContent**)malloc(sizeof(DataContent*)*(count+1));
+    int i;
+    for(i=0;i<count;i++){
+        dc[i] = (DataContent*)malloc(sizeof(DataContent));
+    }
+    dh->head = dc[count-1];
+    dh->lastestCommon = dc[0];
+    dh->current = dc[count-1];
+    dc[count] = NULL;
     
     string init;
     init.assign(result);
@@ -2988,6 +3039,9 @@ Data* queryDataByID(char* dataID){
         }
         free(dc_str[i]);
     }
+    free(rid_dh);
+    free(dc_str);
+    free(dc);
     return dt;
 }
 
@@ -3033,10 +3087,12 @@ t_bool isObjectUnderData(char* dataID, char* objID){
     
     if(strcmp(token,"0")!=0){
         printf("object is under data.\n");
+        free(result);
         return TRUE;
     }
     else{
         printf("object isn't under data.\n");
+        free(result);
         return FALSE;
     }
 }
@@ -3359,23 +3415,59 @@ void testCRUD(Data** data){
     
     printf("head: %s\n", q_data->content->head->fullContent->data);
     printf("last: %s\n", q_data->content->lastestCommon->minusPatch->data);
+    
     int count_dc = countDataContent(q_data);
     printf("count_dc: %d\n",count_dc);
     
-    
-    for(i=0;i<count_dc-1;i++){
-        ObjectBinary* obj_nv = getContentNextVer(q_data);
-        if(obj_nv != NULL){
-            printf("schemaCode_nv: %d\n",obj_nv->schemaCode);
-            printf("byteCount_nv: %d\n",obj_nv->byteCount);
-            printf("data_nv: %s\n",obj_nv->data);
-            free(obj_nv->data);
-            free(obj_nv);
-            
+    /* free Data */
+    DataContent *mydc, *next_mydc;
+    for(mydc=q_data->content->lastestCommon;mydc!=NULL;mydc=next_mydc){
+        printf("-- %d --\n",i);
+        next_mydc = mydc->nextVersion;
+        if(mydc->SHA256hashCode != NULL)
+            free(mydc->SHA256hashCode);
+        if(mydc->timeStamp != NULL)
+            free(mydc->timeStamp->timeStampCode);
+        if(mydc->minusPatch != NULL){
+            printf("minus: %s\n",mydc->minusPatch->data);
+            free(mydc->minusPatch->data);
+            free(mydc->minusPatch);
         }
-        if(i != count_dc-1)
-            q_data->content->current = q_data->content->current->preVersion;
+        if(mydc->plusPatch != NULL){
+            printf("plus: %s\n",mydc->plusPatch->data);
+            printf("len: %d\n",strlen(mydc->plusPatch->data));
+            printf("sizeof: %d\n",sizeof(mydc->plusPatch->data));
+            free(mydc->plusPatch->data);
+            free(mydc->plusPatch);
+        }
+        if(mydc->fullContent != NULL){
+            printf("full: %s\n",mydc->fullContent->data);
+            free(mydc->fullContent->data);
+            free(mydc->fullContent);
+        }
+        free(mydc);
+        i++;
     }
+    free(q_data->content);
+    free((char*)q_data->dataID);
+    free(q_data->dataName);
+    free(q_data->chatRoom);
+    free(q_data);
+    
+    
+//    for(i=0;i<count_dc-1;i++){
+//        ObjectBinary* obj_nv = getContentNextVer(q_data);
+//        if(obj_nv != NULL){
+//            printf("schemaCode_nv: %d\n",obj_nv->schemaCode);
+//            printf("byteCount_nv: %d\n",obj_nv->byteCount);
+//            printf("data_nv: %s\n",obj_nv->data);
+//            free(obj_nv->data);
+//            free(obj_nv);
+//            
+//        }
+//        if(i != count_dc-1)
+//            q_data->content->current = q_data->content->current->preVersion;
+//    }
     
 //    addState2CategoryByID("2603169373904B9FBF05F72620D70F3D", "C27C43B2CDD74AADB9A9096EFFCFB7BE");
 //    addTask2StateByID("A1C49651099946C7B2F9CD0B70092797", "4EC579D4402740A19D1DADA9542D38E5");
