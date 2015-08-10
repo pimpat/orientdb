@@ -1039,20 +1039,23 @@ ObjectBinary* createNewObjBinary(char* data){
 }
 
 int countDataContent(Data* data){
-//    DataContent *dc = (DataContent*)malloc(sizeof(DataContent));
-//    DataContent *next = (DataContent*)malloc(sizeof(DataContent));
-//    int i=1;
-//    for(dc = data->content->lastestCommon;dc!=NULL;dc=next){
-//        i++;
-//        next = dc->nextVersion;
-//    }
-    printf("\n'countDataContent'\n");
+//    printf("\n'countDataContent'\n");
     DataContent* dc = data->content->lastestCommon;
+    if(dc==NULL){
+        ("\n!!! Not found DataContent !!!\n");
+    }
+
     int i=1;
     while(dc!=NULL){
+//        printf("dc-SHA: %s\n",dc->SHA256hashCode);
         i++;
-        dc = dc->nextVersion;
+        if(dc->nextVersion!=NULL)
+            dc = dc->nextVersion;
+        else{
+            break;
+        }
     }
+//    printf("i: %d\n",i);
     return i;
 }
 
@@ -2573,6 +2576,8 @@ Data* queryDataByRid(char* rid){
         
         tmp_tok = strtok(NULL, "#");
     }
+    dc[0]->preVersion = NULL;
+    dc[count-1]->nextVersion = NULL;
     free(result);
     
     char* br;
@@ -2890,6 +2895,8 @@ Data* queryDataByID(char* dataID){
         
         tmp_tok = strtok(NULL, "#");
     }
+    dc[0]->preVersion = NULL;
+    dc[count-1]->nextVersion = NULL;
     free(result);
 
     char* br;
@@ -3417,42 +3424,42 @@ void testCRUD(Data** data){
     printf("last: %s\n", q_data->content->lastestCommon->minusPatch->data);
     
     int count_dc = countDataContent(q_data);
-    printf("count_dc: %d\n",count_dc);
+    printf("count_dc: %d\n",count_dc-1);
     
     /* free Data */
-    DataContent *mydc, *next_mydc;
-    for(mydc=q_data->content->lastestCommon;mydc!=NULL;mydc=next_mydc){
-        printf("-- %d --\n",i);
-        next_mydc = mydc->nextVersion;
-        if(mydc->SHA256hashCode != NULL)
-            free(mydc->SHA256hashCode);
-        if(mydc->timeStamp != NULL)
-            free(mydc->timeStamp->timeStampCode);
-        if(mydc->minusPatch != NULL){
-            printf("minus: %s\n",mydc->minusPatch->data);
-            free(mydc->minusPatch->data);
-            free(mydc->minusPatch);
-        }
-        if(mydc->plusPatch != NULL){
-            printf("plus: %s\n",mydc->plusPatch->data);
-            printf("len: %d\n",strlen(mydc->plusPatch->data));
-            printf("sizeof: %d\n",sizeof(mydc->plusPatch->data));
-            free(mydc->plusPatch->data);
-            free(mydc->plusPatch);
-        }
-        if(mydc->fullContent != NULL){
-            printf("full: %s\n",mydc->fullContent->data);
-            free(mydc->fullContent->data);
-            free(mydc->fullContent);
-        }
-        free(mydc);
-        i++;
-    }
-    free(q_data->content);
-    free((char*)q_data->dataID);
-    free(q_data->dataName);
-    free(q_data->chatRoom);
-    free(q_data);
+//    DataContent *mydc, *next_mydc;
+//    for(mydc=q_data->content->lastestCommon;mydc!=NULL;mydc=next_mydc){
+//        printf("-- %d --\n",i);
+//        next_mydc = mydc->nextVersion;
+//        if(mydc->SHA256hashCode != NULL)
+//            free(mydc->SHA256hashCode);
+//        if(mydc->timeStamp != NULL)
+//            free(mydc->timeStamp->timeStampCode);
+//        if(mydc->minusPatch != NULL){
+//            printf("minus: %s\n",mydc->minusPatch->data);
+//            free(mydc->minusPatch->data);
+//            free(mydc->minusPatch);
+//        }
+//        if(mydc->plusPatch != NULL){
+//            printf("plus: %s\n",mydc->plusPatch->data);
+//            printf("len: %d\n",strlen(mydc->plusPatch->data));
+//            printf("sizeof: %d\n",sizeof(mydc->plusPatch->data));
+//            free(mydc->plusPatch->data);
+//            free(mydc->plusPatch);
+//        }
+//        if(mydc->fullContent != NULL){
+//            printf("full: %s\n",mydc->fullContent->data);
+//            free(mydc->fullContent->data);
+//            free(mydc->fullContent);
+//        }
+//        free(mydc);
+//        i++;
+//    }
+//    free(q_data->content);
+//    free((char*)q_data->dataID);
+//    free(q_data->dataName);
+//    free(q_data->chatRoom);
+//    free(q_data);
     
     
 //    for(i=0;i<count_dc-1;i++){
@@ -3481,9 +3488,5 @@ void testCRUD(Data** data){
     
     disconnectServer();
     close(Sockfd);
-//    free((char*)uuid_state);
-//    free((char*)uuid_user);
-//    free((char*)uuid_cat);
- 
 }
 
