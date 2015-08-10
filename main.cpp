@@ -164,6 +164,7 @@ const char* createNewData(int dataType);                // global Data
 const char* _createNewData(Data** data, int dataType);  // local Data
 DataHolder* createNewDataHolder();
 ObjectBinary* createNewObjBinary(char* data);
+ObjectBinary* _createNewObjBinary(char* data, int dataType);
 int countDataContent(Data* data);
 
 void setDataName(Data* data, char* dataName);
@@ -173,13 +174,13 @@ char* getChatRoom(Data* data);
 
 ReturnErr setDataNameByID(char* dataID, char* dataName);
 ReturnErr setChatRoomByID(char* dataID, char* chatRoom);
-//char* getDataNameByID(char* dataID);
-//char* getChatRoomByID(char* dataID);
+char* getDataNameByID(char* dataID);
+char* getChatRoomByID(char* dataID);
 
 ObjectBinary* getDataContent(Data* data);
 ObjectBinary* getDataContentLastestCommon(Data* data);
-//ObjectBinary* getDataContentByID(char* dataID);
-//ObjectBinary* getDataContentLastestCommonByID(char* dataID);
+ObjectBinary* getDataContentByID(char* dataID);
+ObjectBinary* getDataContentLastestCommonByID(char* dataID);
 
 Text getDiffDataAtHead(Data* data);
 Text getDiffDataAtLastestCommon(Data* data);
@@ -269,6 +270,8 @@ string getPatch(char* str, char* str_patch);
 void test_setNewData();
 void test_getData(Data** data);
 void testCRUD(Data** data);
+void freeData(Data* data);
+void freeObjBinary(ObjectBinary* obj);
 
 std::string& replace(std::string& s, const std::string& from, const std::string& to);
 int main() {
@@ -1038,6 +1041,14 @@ ObjectBinary* createNewObjBinary(char* data){
     return obj;
 }
 
+ObjectBinary* _createNewObjBinary(char* data, int dataType){
+    ObjectBinary* obj = (ObjectBinary*)malloc(sizeof(ObjectBinary));
+    obj->schemaCode = dataType;
+    obj->byteCount = (int)strlen(data);
+    obj->data = strdup(data);
+    return obj;
+}
+
 int countDataContent(Data* data){
 //    printf("\n'countDataContent'\n");
     DataContent* dc = data->content->lastestCommon;
@@ -1122,10 +1133,47 @@ ReturnErr setChatRoomByID(char* dataID, char* chatRoom){
     return 0;
 }
 
+char* getDataNameByID(char* dataID){
+    char sql[MAX_SQL_SIZE];
+    printf("--------------------------------------------------[get_dataName]\n");
+    sprintf(sql,"select dataName from Data where dataID='%s'",dataID);
+    char* result = getContent(sql);
+    printf("result: %s\n",result);
+    if(result == NULL){
+        return NULL;
+    }
+    char *token, *dataName;
+    token=strtok(result, "\"");
+    token=strtok(NULL, "\"");
+//    printf("token: %s\n",token);
+    dataName = strdup(token);
+    free(result);
+    return dataName;
+}
+
+char* getChatRoomByID(char* dataID){
+    char sql[MAX_SQL_SIZE];
+    printf("--------------------------------------------------[get_chatRoom]\n");
+    sprintf(sql,"select chatRoom from Data where dataID='%s'",dataID);
+    char* result = getContent(sql);
+    printf("result: %s\n",result);
+    if(result == NULL){
+        return NULL;
+    }
+    char *token, *chatRoom;
+    token=strtok(result, "\"");
+    token=strtok(NULL, "\"");
+//    printf("token: %s\n",token);
+    chatRoom = strdup(token);
+    free(result);
+    return chatRoom;
+}
+
 ObjectBinary* getDataContent(Data* data){
     if(data->content->head != NULL){
         ObjectBinary* obj_h = data->content->head->fullContent;
-        ObjectBinary* result = createNewObjBinary(obj_h->data);
+//        ObjectBinary* result = createNewObjBinary(obj_h->data);
+        ObjectBinary* result = _createNewObjBinary(obj_h->data,data->dataType);
         return result;
     }
     else
@@ -1138,7 +1186,8 @@ ObjectBinary* getDataContentLastestCommon(Data* data){
     //    data->content->lastestCommon->preVersion = NULL;
     if(data->content->head != NULL){
         if(data->content->lastestCommon->fullContent != NULL && data->content->lastestCommon->plusPatch == NULL){
-            ObjectBinary* result = createNewObjBinary(data->content->lastestCommon->fullContent->data);
+//            ObjectBinary* result = createNewObjBinary(data->content->lastestCommon->fullContent->data);
+            ObjectBinary* result = _createNewObjBinary(data->content->lastestCommon->fullContent->data, data->dataType);
             return result;
         }
         else{
@@ -1151,13 +1200,117 @@ ObjectBinary* getDataContentLastestCommon(Data* data){
                 free(init_str);
                 init_str = strdup(s.c_str());
             }
-            ObjectBinary* result = createNewObjBinary(init_str);
+//            ObjectBinary* result = createNewObjBinary(init_str);
+            ObjectBinary* result = _createNewObjBinary(init_str,data->dataType);
             free(init_str);
             return result;
         }
     }
     else
         return NULL;
+}
+
+ObjectBinary* getDataContentByID(char* dataID){
+    printf(">> getDataContentByID\n");
+    char sql[MAX_SQL_SIZE];
+    
+    //  check edge toDeletedData exist
+    printf("--------------------------------------------------[check_toDeletedData_exist]\n");
+    sprintf(sql,"select count(*) from (select expand(out('toDeletedData')) from DeleteNode) where dataID = '%s'",dataID);
+    printf("SQL: %s\n",sql);
+    char* result = getContent(sql);
+    char* token = strtok(result,":");
+    token = strtok(NULL,"l");
+    printf("count: %s\n\n",token);
+    int count = atoi(token);
+    free(result);
+    
+    if(count!=0){
+        return NULL;
+    }
+    
+    printf("--------------------------------------------------[get_DataContent]\n");
+    sprintf(sql,"select full_schemaCode,full_byteCount,full_data from (select expand(out('toDataHolder').outE('toDataContent')[type='head'].inV()) from Data where dataID='%s')",dataID);
+    printf("SQL: %s\n",sql);
+    result = getContent(sql);
+    printf("\nresult: %s\n",result);
+    if(result==NULL){
+        printf("'%s' not found fullContent\n",dataID);
+        return NULL;
+    }
+    else{
+        string init;
+        init.assign(result);
+        printf("before: %s\n",result);
+        string res = replace(init,"\\'","'");
+        res = replace(res,"\\\"","\"");
+        printf("\n------------------------------------------------------------------------------------------------------------\n\n");
+        printf("replace: %s\n",res.c_str());
+        printf("\n------------------------------------------------------------------------------------------------------------\n\n");
+        
+        free(result);
+        result = strdup(res.c_str());
+        
+        ObjectBinary* obj =(ObjectBinary*)malloc(sizeof(ObjectBinary));
+        
+        char *token, *br, *pt_data;
+        //  schemaCode
+        token = strtok_r(result,":",&br);
+        token = strtok_r(NULL,",",&br);
+        printf("schemaCode: %s\n",token);
+        obj->schemaCode = atoi(token);
+        
+        //  byteCount
+        token = strtok_r(NULL,":",&br);
+        token = strtok_r(NULL,",",&br);
+        printf("bytecount: %s\n",token);
+        obj->byteCount = atoi(token);
+        
+        printf("br: %s\n",br);
+        pt_data = br+11;
+        printf("pt_data: %s\n",pt_data);
+        
+        int b_count = atoi(token);
+        printf("b_count: %d\n",b_count);
+        
+        obj->data = (char*)calloc(b_count+1,sizeof(char));
+        memcpy(obj->data,pt_data,b_count);
+        printf("obj_data: %s\n",obj->data);
+        
+        free(result);
+        return obj;
+    }
+}
+
+ObjectBinary* getDataContentLastestCommonByID(char* dataID){
+    printf(">> getDataContentLastestCommonByID\n");
+    char sql[MAX_SQL_SIZE];
+    
+    //  check edge toDeletedData exist
+    printf("--------------------------------------------------[check_toDeletedData_exist]\n");
+    sprintf(sql,"select count(*) from (select expand(out('toDeletedData')) from DeleteNode) where dataID = '%s'",dataID);
+    printf("SQL: %s\n",sql);
+    char* result = getContent(sql);
+    char* token = strtok(result,":");
+    token = strtok(NULL,"l");
+    printf("count: %s\n\n",token);
+    int count = atoi(token);
+    free(result);
+    
+    if(count!=0){
+        return NULL;
+    }
+
+    printf("--------------------------------------------------[get_DataContent]\n");
+    Data* dt = queryDataByID(dataID);
+    if(dt==NULL){
+        return NULL;
+    }
+    else{
+        ObjectBinary* obj = getDataContentLastestCommon(dt);
+        freeData(dt);
+        return obj;
+    }
 }
 
 Text getDiffDataAtHead(Data* data){
@@ -1183,7 +1336,8 @@ Text getDiffDataAtLastestCommon(Data* data){
 ObjectBinary* getContentNextVer(Data* data){
     if(data->content->current != NULL && data->content->current->nextVersion != NULL){
         if(data->content->current->nextVersion->fullContent!= NULL){
-            ObjectBinary* result = createNewObjBinary(data->content->current->nextVersion->fullContent->data);
+//            ObjectBinary* result = createNewObjBinary(data->content->current->nextVersion->fullContent->data);
+            ObjectBinary* result = _createNewObjBinary(data->content->current->nextVersion->fullContent->data,data->dataType);
             return result;
         }
         else{
@@ -1207,7 +1361,8 @@ ObjectBinary* getContentNextVer(Data* data){
                 init_str = strdup(s.c_str());
                 i--;
             }
-            ObjectBinary* result = createNewObjBinary(init_str);
+//            ObjectBinary* result = createNewObjBinary(init_str);
+            ObjectBinary* result = _createNewObjBinary(init_str,data->dataType);
             free(init_str);
             return result;
         }
@@ -1221,7 +1376,8 @@ ObjectBinary* getContentNextVer(Data* data){
 ObjectBinary* getContentPreVer(Data* data){
     if(data->content->current != NULL && data->content->current->preVersion != NULL){
         if(data->content->current->preVersion->fullContent!= NULL){
-            ObjectBinary* result = createNewObjBinary(data->content->current->preVersion->fullContent->data);
+//            ObjectBinary* result = createNewObjBinary(data->content->current->preVersion->fullContent->data);
+            ObjectBinary* result = _createNewObjBinary(data->content->current->preVersion->fullContent->data,data->dataType);
             return result;
         }
         else{
@@ -1245,7 +1401,8 @@ ObjectBinary* getContentPreVer(Data* data){
                 init_str = strdup(s.c_str());
                 i--;
             }
-            ObjectBinary* result = createNewObjBinary(init_str);
+//            ObjectBinary* result = createNewObjBinary(init_str);
+            ObjectBinary* result = _createNewObjBinary(init_str,data->dataType);
             free(init_str);
             return result;
         }
@@ -1508,7 +1665,8 @@ ReturnErr setNewDataDiffWithTag(Data* data, char* tagName, char* id, Text diff){
         printf("new_xml: %s\n", new_xml);
     }
 
-    ObjectBinary* objB = createNewObjBinary(new_xml);
+//    ObjectBinary* objB = createNewObjBinary(new_xml);
+    ObjectBinary* objB = _createNewObjBinary(new_xml,data->dataType);
     int ret = setNewDataContent(data, objB);
 
     free(objB->data);
@@ -1820,8 +1978,7 @@ const char* createData(Text dataName, Schema* dataSchema, int dType){
     
     //  DataContent
     printf("--------------------------------------------------[create_vertex_DataContent]\n");
-    // now set schemaCode = 0
-    sprintf(sql,"CREATE VERTEX Datacontent set isDiff=%d, SHA256hashCode='%s', full_schemaCode=%d, full_byteCount=%d, full_data='%s'",FALSE,"h-a-s-h",0,strlen(dataSchema),dataSchema);
+    sprintf(sql,"CREATE VERTEX Datacontent set isDiff=%d, SHA256hashCode='%s', full_schemaCode=%d, full_byteCount=%d, full_data='%s'",FALSE,"h-a-s-h",dType,strlen(dataSchema),dataSchema);
 //    printf("SQL: %s\n",sql);
     ret = createVertex(sql,&dc_cltid,&dc_rid);
     if (ret!=0){
@@ -2394,16 +2551,30 @@ Data** queryDataFromData(char* dataID, int dType){
     }
     
     Data** dt = (Data**)malloc(sizeof(Data*)*(count+1));
-    for(i=0;i<count;i++){
-        dt[i] = (Data*)malloc(sizeof(Data));
-    }
+//    for(i=0;i<count;i++){
+//        dt[i] = (Data*)malloc(sizeof(Data));
+//    }
     for(j=0;result_rid[j]!=NULL;j++){
         if(strcmp(result_rid[j],"-")!=0){
             dt[j] = queryDataByRid(result_rid[j]);
         }
     }
-    printf("j: %d\n",j);
-    dt[j]=NULL;
+//    printf("j: %d\n",j);
+    dt[count]=NULL;
+    
+    if(dup_rid!=NULL){
+        for(i=0;dup_rid[i]!=NULL;i++){
+            free(dup_rid[i]);
+        }
+        free(dup_rid);
+    }
+    
+    if(result_rid!=NULL){
+        for(i=0;result_rid[i]!=NULL;i++){
+            free(result_rid[i]);
+        }
+        free(result_rid);
+    }
     
     return dt;
 //    return NULL;
@@ -2446,6 +2617,9 @@ Data* queryDataByRid(char* rid){
         token = strtok(NULL,"\"");
         printf("chatRoom: %s\n\n",token);
         dt->chatRoom = strdup(token);
+    }
+    else{
+        dt->chatRoom = NULL;
     }
     
     free(result);
@@ -3142,9 +3316,9 @@ void test_setNewData(){
     char content1[] = "<root><attachmentFTOLinks></attachmentFTOLinks><book_id>bk100</book_id><author>Pim</author><title>XML Developer's Guide</title><genre>Computer</genre><price>44.95</price></root>";
     char content2[] = "<root><attachmentFTOLinks><link id='1'>www.xyz.com</link><link id='2'>www.123.com</link></attachmentFTOLinks><book_id>bk100</book_id><author>Pim</author><title>XML Developer's Guide</title><genre>Computer</genre><price>44.95</price></root>";
     
-    ObjectBinary* obj0 = createNewObjBinary(content0);
-    ObjectBinary* obj1 = createNewObjBinary(content1);
-    ObjectBinary* obj2 = createNewObjBinary(content2);
+    ObjectBinary* obj0 = _createNewObjBinary(content0,_mydata->dataType);
+    ObjectBinary* obj1 = _createNewObjBinary(content1,_mydata->dataType);
+    ObjectBinary* obj2 = _createNewObjBinary(content2,_mydata->dataType);
     
     setNewDataContent(_mydata,obj0);
     setNewDataContent(_mydata,obj1);
@@ -3330,8 +3504,9 @@ void test_getData(Data** data){
 }
 
 void testCRUD(Data** data){
+//----[1]------------------------------------------------------------------
 //    prepareDB();
-    
+//-------------------------------------------------------------------------
     int ret;
     Sockfd = connectSocket();
     if (Sockfd < 0){
@@ -3349,6 +3524,7 @@ void testCRUD(Data** data){
 //    createVertex(sql, &_cltid, &_rid);
 //    printf("@rid #%d:%lu\n",_cltid,_rid);
     
+//----[2]------------------------------------------------------------------
 /*
     Schema test_schema[]="<root><attachmentFTOLinks></attachmentFTOLinks><book_id></book_id><author></author><title></title><genre></genre><price></price></root>";
     
@@ -3374,93 +3550,88 @@ void testCRUD(Data** data){
     addState2CategoryByID((char*)uuid_cat2,(char*)uuid_state2);
     //  myState2 --> myTask
     addTask2StateByID((char*)uuid_state2,(char*)uuid_task);
-    
+    //  myState2 --> myTask2
+    addData2Data((char*)uuid_state2,dt,_toTask);
+ 
     //  delete myState
     deleteObj((char*)uuid_user2, (char*)uuid_cat2, (char*)uuid_state);
 */
-    
+//-------------------------------------------------------------------------
     Data* dt = *data;
-//    addData2Data("A1C49651099946C7B2F9CD0B70092797",dt,_toTask);
-    
+    int i=0;
+
+//----[3]------------------------------------------------------------------
 //    setDataNameByID("A99B27E341CA424D84FADCCB5B856910","Tanapon");
 //    setChatRoomByID("A99B27E341CA424D84FADCCB5B856910", "chat-room2");
+//-------------------------------------------------------------------------
     
-/*
-    char sql1[]="select from (select expand(out('toCategory').out('toState')) from Data where dataID='A99B27E341CA424D84FADCCB5B856910')";
-    char sql2[]="select from (select expand(out('toCategory').out('toState')) from Data where dataID='E426EE67B22545B99B278A2F874FFECD')";
-    char* res1 = getContent(sql1);
-    printf("res1: %s\n",res1);
-    char* res2 = getContent(sql2);
-    printf("res2: %s\n",res2);
-*/
-    
-//    char** tmp = getArrayRid("select @rid from Data");
-//    queryDataFromData("C27C43B2CDD74AADB9A9096EFFCFB7BE", _user);
-    
-//    Data** arr_dt = queryDataFromData("E4DEA39D5E7646918E07B414C2CC0671", _user);
-    int i;
+//----[4]------------------------------------------------------------------
+//    Data** arr_dt = queryAllUsersFromData("E4DEA39D5E7646918E07B414C2CC0671");
 //    for(i=0;arr_dt[i]!=NULL;i++){
-//        printf("arrdt[%d]: %s\n",i,arr_dt[i]->dataName);
+//        printf("id-arrdt[%d]: %s\n",i,arr_dt[i]->dataID);
+//        printf("name-arrdt[%d]: %s\n",i,arr_dt[i]->dataName);
+//        printf("type-arrdt[%d]: %d\n",i,arr_dt[i]->dataType);
+//        freeData(arr_dt[i]);
 //    }
+//    free(arr_dt);
+//-------------------------------------------------------------------------
     
-    //  test-Category --> myState2 ??
-    isObjectUnderData("2603169373904B9FBF05F72620D70F3D","A1C49651099946C7B2F9CD0B70092797");
-    //  myState2 --> test-Category ??
-    isObjectUnderData("A1C49651099946C7B2F9CD0B70092797","2603169373904B9FBF05F72620D70F3D");
+//----[5]------------------------------------------------------------------
+//    //  test-Category --> myState2 ??
+//    t_bool bl1 = isObjectUnderData("2603169373904B9FBF05F72620D70F3D","A1C49651099946C7B2F9CD0B70092797");
+//    //  myState2 --> test-Category ??
+//    t_bool bl2 = isObjectUnderData("A1C49651099946C7B2F9CD0B70092797","2603169373904B9FBF05F72620D70F3D");
+//    printf("bl1: %d\n",bl1);
+//    printf("bl2: %d\n",bl2);
+//-------------------------------------------------------------------------
     
 //    const char* uuid_org = createOrg("Throughwave",test_schema);
 //    addUser2OrgByID((char*)uuid_org,"A99B27E341CA424D84FADCCB5B856910");
+
+//----[6]------------------------------------------------------------------
+//    Data* q_data = queryDataByID("AB461924401F4B98B3DBB183CA9FEA50");
+//    
+//    printf("\n--- query Data ---\n");
+//    printf("dataID: %s\n", q_data->dataID);
+//    printf("dataName: %s\n", q_data->dataName);
+//    printf("dataType: %d\n", q_data->dataType);
+//    printf("chatRoom: %s\n", q_data->chatRoom);
+//    printf("versionKeeped: %d\n", q_data->content->versionKeeped);
+//    
+//    printf("head: %s\n", q_data->content->head->fullContent->data);
+//    printf("last: %s\n", q_data->content->lastestCommon->minusPatch->data);
+//    
+//    int count_dc = countDataContent(q_data);
+//    printf("count_dc: %d\n",count_dc-1);
+//    
+//    /* free Data */
+//    freeData(q_data);
+//-------------------------------------------------------------------------
+
+//----[7]------------------------------------------------------------------
+//    ObjectBinary *obj_h = getDataContentByID("AB461924401F4B98B3DBB183CA9FEA50");
+//    ObjectBinary *obj_l = getDataContentLastestCommonByID("AB461924401F4B98B3DBB183CA9FEA50");
+//    printf("\n--- getDataContentByID ---\n");
+//    printf("schemaCode: %d\n",obj_h->schemaCode);
+//    printf("byteCount: %d\n",obj_h->byteCount);
+//    printf("data: %s\n",obj_h->data);
+//
+//    printf("\n--- getDataContentLastestCommonByID ---\n");
+//    printf("schemaCode: %d\n",obj_l->schemaCode);
+//    printf("byteCount: %d\n",obj_l->byteCount);
+//    printf("data: %s\n",obj_l->data);
+//    freeObjBinary(obj_h);
+//    freeObjBinary(obj_l);
+//-------------------------------------------------------------------------
     
-    Data* q_data = queryDataByID("AB461924401F4B98B3DBB183CA9FEA50");
-    
-    printf("\n--- query Data ---\n");
-    printf("dataID: %s\n", q_data->dataID);
-    printf("dataName: %s\n", q_data->dataName);
-    printf("dataType: %d\n", q_data->dataType);
-    printf("chatRoom: %s\n", q_data->chatRoom);
-    printf("versionKeeped: %d\n", q_data->content->versionKeeped);
-    
-    printf("head: %s\n", q_data->content->head->fullContent->data);
-    printf("last: %s\n", q_data->content->lastestCommon->minusPatch->data);
-    
-    int count_dc = countDataContent(q_data);
-    printf("count_dc: %d\n",count_dc-1);
-    
-    /* free Data */
-//    DataContent *mydc, *next_mydc;
-//    for(mydc=q_data->content->lastestCommon;mydc!=NULL;mydc=next_mydc){
-//        printf("-- %d --\n",i);
-//        next_mydc = mydc->nextVersion;
-//        if(mydc->SHA256hashCode != NULL)
-//            free(mydc->SHA256hashCode);
-//        if(mydc->timeStamp != NULL)
-//            free(mydc->timeStamp->timeStampCode);
-//        if(mydc->minusPatch != NULL){
-//            printf("minus: %s\n",mydc->minusPatch->data);
-//            free(mydc->minusPatch->data);
-//            free(mydc->minusPatch);
-//        }
-//        if(mydc->plusPatch != NULL){
-//            printf("plus: %s\n",mydc->plusPatch->data);
-//            printf("len: %d\n",strlen(mydc->plusPatch->data));
-//            printf("sizeof: %d\n",sizeof(mydc->plusPatch->data));
-//            free(mydc->plusPatch->data);
-//            free(mydc->plusPatch);
-//        }
-//        if(mydc->fullContent != NULL){
-//            printf("full: %s\n",mydc->fullContent->data);
-//            free(mydc->fullContent->data);
-//            free(mydc->fullContent);
-//        }
-//        free(mydc);
-//        i++;
-//    }
-//    free(q_data->content);
-//    free((char*)q_data->dataID);
-//    free(q_data->dataName);
-//    free(q_data->chatRoom);
-//    free(q_data);
-    
+//----[8]------------------------------------------------------------------
+//    char* name = getDataNameByID("4EC579D4402740A19D1DADA9542D38E5");
+//    char* chat = getChatRoomByID("4EC579D4402740A19D1DADA9542D38E5");
+//    printf("name: %s\n",name);
+//    printf("chat: %s\n",chat);
+//    free(name);
+//    free(chat);
+//-------------------------------------------------------------------------
     
 //    for(i=0;i<count_dc-1;i++){
 //        ObjectBinary* obj_nv = getContentNextVer(q_data);
@@ -3475,18 +3646,64 @@ void testCRUD(Data** data){
 //        if(i != count_dc-1)
 //            q_data->content->current = q_data->content->current->preVersion;
 //    }
-    
+
 //    addState2CategoryByID("2603169373904B9FBF05F72620D70F3D", "C27C43B2CDD74AADB9A9096EFFCFB7BE");
 //    addTask2StateByID("A1C49651099946C7B2F9CD0B70092797", "4EC579D4402740A19D1DADA9542D38E5");
     
-    //  test-Category -x-> myState
+//----[9]------------------------------------------------------------------
+//    //  test-Category -x-> myState
 //    deleteObj("8B8462EC0C8A4519B05A9D9DB788F13F","2603169373904B9FBF05F72620D70F3D", "C27C43B2CDD74AADB9A9096EFFCFB7BE");
-    //  myState2 -x-> myTask2
+//    //  myState2 -x-> myTask2
 //    deleteObj("8B8462EC0C8A4519B05A9D9DB788F13F","A1C49651099946C7B2F9CD0B70092797", "4EC579D4402740A19D1DADA9542D38E5");
+//-------------------------------------------------------------------------
     
+//----[10]------------------------------------------------------------------
 //    flushTrash("8B8462EC0C8A4519B05A9D9DB788F13F");
-    
+//-------------------------------------------------------------------------
     disconnectServer();
     close(Sockfd);
+}
+
+void freeData(Data* data){
+    int i=0;
+    DataContent *mydc, *next_mydc;
+    for(mydc=data->content->lastestCommon;mydc!=NULL;mydc=next_mydc){
+        printf("-- %d --\n",i);
+        next_mydc = mydc->nextVersion;
+        if(mydc->SHA256hashCode != NULL)
+            free(mydc->SHA256hashCode);
+        if(mydc->timeStamp != NULL)
+            free(mydc->timeStamp->timeStampCode);
+        if(mydc->minusPatch != NULL){
+            printf("minus: %s\n",mydc->minusPatch->data);
+            free(mydc->minusPatch->data);
+            free(mydc->minusPatch);
+        }
+        if(mydc->plusPatch != NULL){
+            printf("plus: %s\n",mydc->plusPatch->data);
+            free(mydc->plusPatch->data);
+            free(mydc->plusPatch);
+        }
+        if(mydc->fullContent != NULL){
+            printf("full: %s\n",mydc->fullContent->data);
+            free(mydc->fullContent->data);
+            free(mydc->fullContent);
+        }
+        free(mydc);
+        i++;
+    }
+    
+    free(data->content);
+    free((char*)data->dataID);
+    if(data->dataName!=NULL)
+        free(data->dataName);
+    if(data->chatRoom!=NULL)
+        free(data->chatRoom);
+    free(data);
+}
+
+void freeObjBinary(ObjectBinary* obj){
+    free(obj->data);
+    free(obj);
 }
 
