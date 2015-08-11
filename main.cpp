@@ -1164,9 +1164,16 @@ char* getChatRoomByID(char* dataID){
     token=strtok(result, "\"");
     token=strtok(NULL, "\"");
 //    printf("token: %s\n",token);
-    chatRoom = strdup(token);
-    free(result);
-    return chatRoom;
+    if(token != NULL){
+        chatRoom = strdup(token);
+        free(result);
+        return chatRoom;
+    }
+    else{
+        printf("'%s' not found chatRoom\n",dataID);
+        free(result);
+        return NULL;
+    }
 }
 
 ObjectBinary* getDataContent(Data* data){
@@ -2940,9 +2947,14 @@ Data* queryDataByID(char* dataID){
     dt->dataType = atoi(token);
     
     token = strtok(NULL,"\"");
-    token = strtok(NULL,"\"");
-    printf("chatRoom: %s\n\n",token);
-    dt->chatRoom = strdup(token);
+    if(token!=NULL){
+        token = strtok(NULL,"\"");
+        printf("chatRoom: %s\n\n",token);
+        dt->chatRoom = strdup(token);
+    }
+    else{
+        dt->chatRoom = NULL;
+    }
 
     free(result);
     
@@ -2955,7 +2967,8 @@ Data* queryDataByID(char* dataID){
     if(result==NULL){
         free((char*)dt->dataID);
         free(dt->dataName);
-        free(dt->chatRoom);
+        if(dt->chatRoom != NULL)
+            free(dt->chatRoom);
         free(dt);
         return NULL;
     }
@@ -2990,7 +3003,8 @@ Data* queryDataByID(char* dataID){
         free(dh);
         free((char*)dt->dataID);
         free(dt->dataName);
-        free(dt->chatRoom);
+        if(dt->chatRoom != NULL)
+            free(dt->chatRoom);
         free(dt);
         return NULL;
     }
@@ -3016,7 +3030,8 @@ Data* queryDataByID(char* dataID){
         free(dh);
         free((char*)dt->dataID);
         free(dt->dataName);
-        free(dt->chatRoom);
+        if(dt->chatRoom != NULL)
+            free(dt->chatRoom);
         free(dt);
         return NULL;
     }
@@ -3590,7 +3605,7 @@ void testCRUD(Data** data){
 
 //----[6]------------------------------------------------------------------
 //    Data* q_data = queryDataByID("AB461924401F4B98B3DBB183CA9FEA50");
-//    
+//    Data* q_data = queryDataByID("2603169373904B9FBF05F72620D70F3D");
 //    printf("\n--- query Data ---\n");
 //    printf("dataID: %s\n", q_data->dataID);
 //    printf("dataName: %s\n", q_data->dataName);
@@ -3598,8 +3613,12 @@ void testCRUD(Data** data){
 //    printf("chatRoom: %s\n", q_data->chatRoom);
 //    printf("versionKeeped: %d\n", q_data->content->versionKeeped);
 //    
-//    printf("head: %s\n", q_data->content->head->fullContent->data);
-//    printf("last: %s\n", q_data->content->lastestCommon->minusPatch->data);
+//    if(q_data->content->head->fullContent != NULL)
+//        printf("head: %s\n", q_data->content->head->fullContent->data);
+//    if(q_data->content->lastestCommon->minusPatch != NULL)
+//        printf("last: %s\n", q_data->content->lastestCommon->minusPatch->data);
+//    if(q_data->content->lastestCommon->fullContent != NULL)
+//        printf("last: %s\n", q_data->content->lastestCommon->fullContent->data);
 //    
 //    int count_dc = countDataContent(q_data);
 //    printf("count_dc: %d\n",count_dc-1);
@@ -3627,6 +3646,7 @@ void testCRUD(Data** data){
 //----[8]------------------------------------------------------------------
 //    char* name = getDataNameByID("4EC579D4402740A19D1DADA9542D38E5");
 //    char* chat = getChatRoomByID("4EC579D4402740A19D1DADA9542D38E5");
+//    char* chat = getChatRoomByID("A1C49651099946C7B2F9CD0B70092797");
 //    printf("name: %s\n",name);
 //    printf("chat: %s\n",chat);
 //    free(name);
