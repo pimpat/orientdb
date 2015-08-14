@@ -198,7 +198,7 @@ Text getDiffDataNextVerByID(char* dataID);
 Text getDiffDataPreVerByID(char* dataID);
 
 Text getDataContentWithTag(Data* data, char* tagName, char* id);
-//Text getDataContentWithTagByID(char* dataID, char* tagName);
+Text getDataContentWithTagByID(char* dataID, char* tagName, char* id);
 
 ReturnErr setNewDataContent(Data* data, ObjectBinary* content);
 ReturnErr setNewDataDiffWithTag(Data* data, char* tagName, char* id, Text diff);
@@ -260,6 +260,7 @@ t_bool isObjectUnderData(char* dataID, char* objID);
 
 ReturnErr deleteObj(char* userID, char* upperID, char* objID);
 ReturnErr flushTrash(char* userID);
+int checkDeleted(char* dataID);
 
 /* diff-patch function */
 string getDiff(char* old_str, char* new_str);
@@ -1112,6 +1113,11 @@ char* getChatRoom(Data* data){
 }
 
 ReturnErr setDataNameByID(char* dataID, char* dataName){
+    int count = checkDeleted(dataID);
+    if(count==-1){
+        return -1;
+    }
+    
     char sql[MAX_SQL_SIZE];
     printf("--------------------------------------------------[update_dataName]\n");
     sprintf(sql,"update Data set dataName='%s' where dataID='%s'",dataName,dataID);
@@ -1124,6 +1130,11 @@ ReturnErr setDataNameByID(char* dataID, char* dataName){
 }
 
 ReturnErr setChatRoomByID(char* dataID, char* chatRoom){
+    int count = checkDeleted(dataID);
+    if(count==-1){
+        return -1;
+    }
+    
     char sql[MAX_SQL_SIZE];
     printf("--------------------------------------------------[update_chatRoom]\n");
     sprintf(sql,"update Data set chatRoom='%s' where dataID='%s'",chatRoom,dataID);
@@ -1136,6 +1147,11 @@ ReturnErr setChatRoomByID(char* dataID, char* chatRoom){
 }
 
 char* getDataNameByID(char* dataID){
+    int count = checkDeleted(dataID);
+    if(count==-1){
+        return NULL;
+    }
+    
     char sql[MAX_SQL_SIZE];
     printf("--------------------------------------------------[get_dataName]\n");
     sprintf(sql,"select dataName from Data where dataID='%s'",dataID);
@@ -1154,6 +1170,11 @@ char* getDataNameByID(char* dataID){
 }
 
 char* getChatRoomByID(char* dataID){
+    int count = checkDeleted(dataID);
+    if(count==-1){
+        return NULL;
+    }
+    
     char sql[MAX_SQL_SIZE];
     printf("--------------------------------------------------[get_chatRoom]\n");
     sprintf(sql,"select chatRoom from Data where dataID='%s'",dataID);
@@ -1221,26 +1242,14 @@ ObjectBinary* getDataContentLastestCommon(Data* data){
 
 ObjectBinary* getDataContentByID(char* dataID){
     printf(">> getDataContentByID\n");
-    char sql[MAX_SQL_SIZE];
-    
-    //  check edge toDeletedData exist
-    printf("--------------------------------------------------[check_toDeletedData_exist]\n");
-    sprintf(sql,"select count(*) from (select expand(out('toDeletedData')) from DeleteNode) where dataID = '%s'",dataID);
-    printf("SQL: %s\n",sql);
-    char* result = getContent(sql);
-    printf("\nresult: %s\n",result);
-    
-    char* token = strtok(result,":");
-    token = strtok(NULL,"l");
-    printf("count: %s\n\n",token);
-    int count = atoi(token);
-    free(result);
-    
-    if(count!=0){
-        printf("'%s' not found data or data is deleted\n",dataID);
+    int count = checkDeleted(dataID);
+    if(count==-1){
+//        printf("'%s' not found data or data is deleted\n",dataID);
         return NULL;
     }
     
+    char sql[MAX_SQL_SIZE];
+    char* result;
     printf("--------------------------------------------------[get_DataContent]\n");
     sprintf(sql,"select full_schemaCode,full_byteCount,full_data from (select expand(out('toDataHolder').outE('toDataContent')[type='head'].inV()) from Data where dataID='%s')",dataID);
     printf("SQL: %s\n",sql);
@@ -1296,26 +1305,14 @@ ObjectBinary* getDataContentByID(char* dataID){
 
 ObjectBinary* getDataContentLastestCommonByID(char* dataID){
     printf(">> getDataContentLastestCommonByID\n");
-    char sql[MAX_SQL_SIZE];
-    
-    //  check edge toDeletedData exist
-    printf("--------------------------------------------------[check_toDeletedData_exist]\n");
-    sprintf(sql,"select count(*) from (select expand(out('toDeletedData')) from DeleteNode) where dataID = '%s'",dataID);
-    printf("SQL: %s\n",sql);
-    char* result = getContent(sql);
-    printf("\nresult: %s\n",result);
-    
-    char* token = strtok(result,":");
-    token = strtok(NULL,"l");
-    printf("count: %s\n\n",token);
-    int count = atoi(token);
-    free(result);
-    
-    if(count!=0){
-        printf("'%s' not found data or data is deleted\n",dataID);
+    int count = checkDeleted(dataID);
+    if(count==-1){
+        //        printf("'%s' not found data or data is deleted\n",dataID);
         return NULL;
     }
-
+    
+    char sql[MAX_SQL_SIZE];
+    char* result;
     printf("--------------------------------------------------[get_DataContent]\n");
     Data* dt = queryDataByID(dataID);
     if(dt==NULL){
@@ -1350,26 +1347,14 @@ Text getDiffDataAtLastestCommon(Data* data){
 
 Text getDiffDataAtHeadByID(char* dataID){
     printf(">> getDiffDataAtHeadByID\n");
-    char sql[MAX_SQL_SIZE];
-    
-    //  check edge toDeletedData exist
-    printf("--------------------------------------------------[check_toDeletedData_exist]\n");
-    sprintf(sql,"select count(*) from (select expand(out('toDeletedData')) from DeleteNode) where dataID = '%s'",dataID);
-    printf("SQL: %s\n",sql);
-    char* result = getContent(sql);
-    printf("\nresult: %s\n",result);
-    
-    char* token = strtok(result,":");
-    token = strtok(NULL,"l");
-    printf("count: %s\n\n",token);
-    int count = atoi(token);
-    free(result);
-    
-    if(count!=0){
-        printf("'%s' not found data or data is deleted\n",dataID);
+    int count = checkDeleted(dataID);
+    if(count==-1){
+        //        printf("'%s' not found data or data is deleted\n",dataID);
         return NULL;
     }
     
+    char sql[MAX_SQL_SIZE];
+    char* result;
     printf("--------------------------------------------------[get_DiffData]\n");
     sprintf(sql,"select plus_byteCount,plus_data from (select expand(out('toDataHolder').outE('toDataContent')[type='head'].inV()) from Data where dataID='%s')",dataID);
     printf("SQL: %s\n",sql);
@@ -1417,26 +1402,14 @@ Text getDiffDataAtHeadByID(char* dataID){
 
 Text getDiffDataAtLastestCommonByID(char* dataID){
     printf(">> getDiffDataAtLastestCommonByID\n");
-    char sql[MAX_SQL_SIZE];
-    
-    //  check edge toDeletedData exist
-    printf("--------------------------------------------------[check_toDeletedData_exist]\n");
-    sprintf(sql,"select count(*) from (select expand(out('toDeletedData')) from DeleteNode) where dataID = '%s'",dataID);
-    printf("SQL: %s\n",sql);
-    char* result = getContent(sql);
-    printf("\nresult: %s\n",result);
-    
-    char* token = strtok(result,":");
-    token = strtok(NULL,"l");
-    printf("count: %s\n\n",token);
-    int count = atoi(token);
-    free(result);
-    
-    if(count!=0){
-        printf("'%s' not found data or data is deleted\n",dataID);
+    int count = checkDeleted(dataID);
+    if(count==-1){
+        //        printf("'%s' not found data or data is deleted\n",dataID);
         return NULL;
     }
     
+    char sql[MAX_SQL_SIZE];
+    char* result;
     printf("--------------------------------------------------[get_DiffData]\n");
     sprintf(sql,"select plus_byteCount,plus_data from (select expand(out('toDataHolder').outE('toDataContent')[type='lastestCommon'].inV()) from Data where dataID='%s')",dataID);
     printf("SQL: %s\n",sql);
@@ -1564,26 +1537,14 @@ ObjectBinary* getContentPreVer(Data* data){
 
 ObjectBinary* getContentNextVerByID(char* dataID){
     printf(">> getContentNextVerByID\n");
-    char sql[MAX_SQL_SIZE];
-    
-    //  check edge toDeletedData exist
-    printf("--------------------------------------------------[check_toDeletedData_exist]\n");
-    sprintf(sql,"select count(*) from (select expand(out('toDeletedData')) from DeleteNode) where dataID = '%s'",dataID);
-    printf("SQL: %s\n",sql);
-    char* result = getContent(sql);
-    printf("\nresult: %s\n",result);
-    
-    char* token = strtok(result,":");
-    token = strtok(NULL,"l");
-    printf("count: %s\n\n",token);
-    int count = atoi(token);
-    free(result);
-    
-    if(count!=0){
-        printf("'%s' not found data or data is deleted\n",dataID);
+    int count = checkDeleted(dataID);
+    if(count==-1){
+        //        printf("'%s' not found data or data is deleted\n",dataID);
         return NULL;
     }
     
+    char sql[MAX_SQL_SIZE];
+    char* result;
     printf("--------------------------------------------------[get_plus_next]\n");
     sprintf(sql,"select plus_byteCount,plus_data from (select expand(out('toDataHolder').outE('toDataContent')[type='current'].inV().outE('toContent')[type='next'].inV()) from Data where dataID='%s')",dataID);
     //  for test only
@@ -1717,26 +1678,14 @@ ObjectBinary* getContentNextVerByID(char* dataID){
 
 ObjectBinary* getContentPreVerByID(char* dataID){
     printf(">> getContentPreVerByID\n");
-    char sql[MAX_SQL_SIZE];
-    
-    //  check edge toDeletedData exist
-    printf("--------------------------------------------------[check_toDeletedData_exist]\n");
-    sprintf(sql,"select count(*) from (select expand(out('toDeletedData')) from DeleteNode) where dataID = '%s'",dataID);
-    printf("SQL: %s\n",sql);
-    char* result = getContent(sql);
-    printf("\nresult: %s\n",result);
-    
-    char* token = strtok(result,":");
-    token = strtok(NULL,"l");
-    printf("count: %s\n\n",token);
-    int count = atoi(token);
-    free(result);
-    
-    if(count!=0){
-        printf("'%s' not found data or data is deleted\n",dataID);
+    int count = checkDeleted(dataID);
+    if(count==-1){
+        //        printf("'%s' not found data or data is deleted\n",dataID);
         return NULL;
     }
     
+    char sql[MAX_SQL_SIZE];
+    char* result;
     printf("--------------------------------------------------[get_minus_pre]\n");
     sprintf(sql,"select minus_byteCount,minus_data from (select expand(out('toDataHolder').outE('toDataContent')[type='current'].inV().outE('toContent')[type='pre'].inV()) from Data where dataID='%s')",dataID);
     printf("SQL: %s\n",sql);
@@ -1878,13 +1827,120 @@ Text getDiffDataPreVer(Data* data){
     }
 }
 
-//Text getDiffDataNextVerByID(char* dataID){
-//    
-//}
-//
-//Text getDiffDataPreVerByID(char* dataID){
-//    
-//}
+Text getDiffDataNextVerByID(char* dataID){
+    printf(">> getDiffDataNextVerByID\n");
+    int count = checkDeleted(dataID);
+    if(count==-1){
+        //        printf("'%s' not found data or data is deleted\n",dataID);
+        return NULL;
+    }
+    
+    char sql[MAX_SQL_SIZE];
+    char* result;
+    printf("--------------------------------------------------[get_plus_next]\n");
+    //  fix 'lastestCommon' --> 'current'
+    sprintf(sql,"select plus_byteCount,plus_data from (select expand(out('toDataHolder').outE('toDataContent')[type='current'].inV().outE('toContent')[type='next'].inV()) from Data where dataID='%s')",dataID);
+    printf("SQL: %s\n",sql);
+    result = getContent(sql);
+    printf("\nresult: %s\n",result);
+    char* plus_diff;
+    
+    if(result==NULL){
+        printf("'%s' not found DiffData\n",dataID);
+        return NULL;
+    }
+    else{
+        printf("\nresult: %s\n",result);
+        string init;
+        init.assign(result);
+        printf("before: %s\n",result);
+        string res = replace(init,"\\'","'");
+        res = replace(res,"\\\"","\"");
+        printf("\n------------------------------------------------------------------------------------------------------------\n\n");
+        printf("replace: %s\n",res.c_str());
+        printf("\n------------------------------------------------------------------------------------------------------------\n\n");
+        
+        free(result);
+        result = strdup(res.c_str());
+        
+        char *token, *br, *pt_data;
+        //  byteCount
+        token = strtok_r(result,":",&br);
+        token = strtok_r(NULL,",",&br);
+        printf("bytecount: %s\n",token);
+        
+        printf("br: %s\n",br);
+        pt_data = br+11;
+        printf("pt_data: %s\n",pt_data);
+        
+        int b_count = atoi(token);
+        printf("b_count: %d\n",b_count);
+        
+        plus_diff= (char*)calloc(b_count+1,sizeof(char));
+        memcpy(plus_diff,pt_data,b_count);
+        printf("plus_diff: %s\n",plus_diff);
+        
+        free(result);
+        return plus_diff;
+    }
+}
+
+Text getDiffDataPreVerByID(char* dataID){
+    printf(">> getDiffDatatPreVerByID\n");
+    int count = checkDeleted(dataID);
+    if(count==-1){
+        //        printf("'%s' not found data or data is deleted\n",dataID);
+        return NULL;
+    }
+    
+    char sql[MAX_SQL_SIZE];
+    char* result;
+    printf("--------------------------------------------------[get_plus_pre]\n");
+    sprintf(sql,"select plus_byteCount,plus_data from (select expand(out('toDataHolder').outE('toDataContent')[type='current'].inV().outE('toContent')[type='pre'].inV()) from Data where dataID='%s')",dataID);
+    printf("SQL: %s\n",sql);
+    result = getContent(sql);
+    printf("\nresult: %s\n",result);
+    char* plus_diff;
+    
+    if(result==NULL){
+        printf("'%s' not found DiffData\n",dataID);
+        return NULL;
+    }
+    else{
+        printf("\nresult: %s\n",result);
+        string init;
+        init.assign(result);
+        printf("before: %s\n",result);
+        string res = replace(init,"\\'","'");
+        res = replace(res,"\\\"","\"");
+        printf("\n------------------------------------------------------------------------------------------------------------\n\n");
+        printf("replace: %s\n",res.c_str());
+        printf("\n------------------------------------------------------------------------------------------------------------\n\n");
+        
+        free(result);
+        result = strdup(res.c_str());
+        
+        char *token, *br, *pt_data;
+        //  byteCount
+        token = strtok_r(result,":",&br);
+        token = strtok_r(NULL,",",&br);
+        printf("bytecount: %s\n",token);
+        
+        printf("br: %s\n",br);
+        pt_data = br+11;
+        printf("pt_data: %s\n",pt_data);
+        
+        int b_count = atoi(token);
+        printf("b_count: %d\n",b_count);
+        
+        plus_diff= (char*)calloc(b_count+1,sizeof(char));
+        memcpy(plus_diff,pt_data,b_count);
+        printf("plus_diff: %s\n",plus_diff);
+        
+        free(result);
+        return plus_diff;
+    }
+}
 
 Text getDataContentWithTag(Data* data, char* tagName, char* id){
     char* full_xml = strdup(data->content->head->fullContent->data);
@@ -1927,6 +1983,17 @@ Text getDataContentWithTag(Data* data, char* tagName, char* id){
     free(full_xml);
     ezxml_free(root);
     return result;
+}
+
+Text getDataContentWithTagByID(char* dataID, char* tagName, char* id){
+    printf(">> getDataContentWithTagByID\n");
+    ObjectBinary* obj = getDataContentByID(dataID);
+    if(obj == NULL){
+        return NULL;
+    }
+    char* res = getTagContentWithName(obj,tagName,id);
+    freeObjBinary(obj);
+    return res;
 }
 
 ReturnErr setNewDataContent(Data* data, ObjectBinary* content){
@@ -2883,6 +2950,31 @@ ReturnErr flushTrash(char* userID){
         return -1;
     }
     return 0;
+}
+
+int checkDeleted(char* dataID){
+    char sql[MAX_SQL_SIZE];
+    
+    //  check edge toDeletedData exist
+    printf("--------------------------------------------------[check_toDeletedData_exist]\n");
+    sprintf(sql,"select count(*) from (select expand(out('toDeletedData')) from DeleteNode) where dataID = '%s'",dataID);
+    printf("SQL: %s\n",sql);
+    char* result = getContent(sql);
+    printf("\nresult: %s\n",result);
+    
+    char* token = strtok(result,":");
+    token = strtok(NULL,"l");
+    printf("count: %s\n\n",token);
+    int count = atoi(token);
+    free(result);
+    
+    if(count!=0){
+        printf("'%s' not found data or data is deleted\n",dataID);
+        return -1;
+    }
+    else{
+        return count;
+    }
 }
 
 Org** queryOrgFromData(char* dataID){
@@ -4136,14 +4228,33 @@ void testCRUD(Data** data){
 //-------------------------------------------------------------------------
 
 //----[12]-----------------------------------------------------------------
-    ObjectBinary *obj_p = getContentPreVerByID("AB461924401F4B98B3DBB183CA9FEA50");
-    if(obj_p != NULL){
-        printf("schemaCode: %d\n",obj_p->schemaCode);
-        printf("byteCount: %d\n",obj_p->byteCount);
-        printf("data: %s\n",obj_p->data);
-        freeObjBinary(obj_p);
-    }
-    ObjectBinary *obj_n = getContentNextVerByID("AB461924401F4B98B3DBB183CA9FEA50");
+//    ObjectBinary *obj_p = getContentPreVerByID("AB461924401F4B98B3DBB183CA9FEA50");
+//    if(obj_p != NULL){
+//        printf("schemaCode: %d\n",obj_p->schemaCode);
+//        printf("byteCount: %d\n",obj_p->byteCount);
+//        printf("data: %s\n",obj_p->data);
+//        freeObjBinary(obj_p);
+//    }
+//    ObjectBinary *obj_n = getContentNextVerByID("AB461924401F4B98B3DBB183CA9FEA50");
+//-------------------------------------------------------------------------
+    
+//----[13]-----------------------------------------------------------------
+//    char* plus_p = getDiffDataPreVerByID("AB461924401F4B98B3DBB183CA9FEA50");
+//    if(plus_p != NULL){
+//        printf("plus_pre: %s\n", plus_p);
+//        free(plus_p);
+//    }
+//    char* plus_n = getDiffDataNextVerByID("AB461924401F4B98B3DBB183CA9FEA50");
+//    if(plus_n != NULL){
+//        printf("plus_next: %s\n", plus_n);
+//        free(plus_n);
+//    }
+//-------------------------------------------------------------------------
+    
+//----[14]-----------------------------------------------------------------
+//    char* value = getDataContentWithTagByID("AB461924401F4B98B3DBB183CA9FEA50","author",NULL);
+//    printf("val: %s\n",value);
+//    free(value);
 //-------------------------------------------------------------------------
     disconnectServer();
     close(Sockfd);
