@@ -202,6 +202,7 @@ Text getDataContentWithTagByID(char* dataID, char* tagName, char* id);
 
 ReturnErr setNewDataContent(Data* data, ObjectBinary* content);
 ReturnErr setNewDataDiffWithTag(Data* data, char* tagName, char* id, Text diff);
+ReturnErr saveNewDataContentByID(char* dataID, char* new_content);
 
 Text getTagContentWithName(ObjectBinary* fullContent, char* tagName, char* id);
 Text getTagContent(ObjectBinary* fullContent, int tagNameEnum, char* id);
@@ -2191,6 +2192,197 @@ ReturnErr setNewDataDiffWithTag(Data* data, char* tagName, char* id, Text diff){
     return ret;
 }
 
+ReturnErr saveNewDataContentByID(char* dataID, char* new_content){
+    printf(">> saveNewDataContentByID\n");
+    ObjectBinary* obj = getDataContentByID(dataID);
+    if(obj == NULL){
+        return -1;
+    }
+    
+    printf("old: %s\n",obj->data);
+    printf("new: %s\n",new_content);
+    
+    string s_plus = getDiff(obj->data,new_content);
+    string s_minus = getDiff(new_content,obj->data);
+    printf("s_plus: %s\n",s_plus.c_str());
+    printf("s_minus: %s\n",s_minus.c_str());
+    freeObjBinary(obj);
+    
+    char* minus_content = strdup(s_minus.c_str());
+    char* plus_content = strdup(s_plus.c_str());
+    //  full_content = new_content
+    int minus_len = strlen(minus_content);
+    int plus_len = strlen(plus_content);
+    int full_len = strlen(new_content);
+    
+    char sql[MAX_SQL_SIZE];
+    char* result;
+    
+    printf("--------------------------------------------------[get_@rid-head,schemaCode]\n");
+    sprintf(sql,"select @rid,full_schemaCode from (select expand(out('toDataHolder').outE('toDataContent')[type='head'].inV()) from Data where dataID='%s')",dataID);
+    printf("SQL: %s\n",sql);
+    result = getContent(sql);
+    
+    if(result==NULL){
+        free(minus_content);
+        free(plus_content);
+        return -1;
+    }
+    printf("\nresult: %s\n",result);
+    
+    char* token = strtok(result,":");
+    token = strtok(NULL,",");
+    printf("head_@rid: %s\n",token);
+    char* rid_head = strdup(token);
+    
+    token = strtok(NULL,":");
+    token = strtok(NULL,",");
+    printf("schemaCode: %s\n\n",token);
+    int schemaCode = atoi(token);
+    
+    free(result);
+    
+    string init_plus, init_minus, init_full;
+    init_plus.assign(plus_content,plus_len);
+    printf("before: %s\n",plus_content);
+    string result_plus = replace(init_plus,"'","\\'");
+    result_plus = replace(result_plus,"\"","\\\"");
+    printf("replace(plus): %s\n",result_plus.c_str());
+    char* res_plus = strdup(result_plus.c_str());
+    
+    init_minus.assign(minus_content,minus_len);
+    printf("before: %s\n",minus_content);
+    string result_minus = replace(init_minus,"'","\\'");
+    result_minus = replace(result_minus,"\"","\\\"");
+    printf("replace(minus): %s\n",result_minus.c_str());
+    char* res_minus = strdup(result_minus.c_str());
+    
+    free(minus_content);
+    free(plus_content);
+    
+    init_full.assign(new_content,full_len);
+    printf("before: %s\n",new_content);
+    string result_full = replace(init_full,"'","\\'");
+    result_full = replace(result_full,"\"","\\\"");
+    printf("replace(full): %s\n",result_full.c_str());
+    char* res_full = strdup(result_full.c_str());
+    
+    //  update (add minus + remove full)
+    //  create new dc (add plus + add full)
+    //  move head, current
+    //  add next(old head), pre(new head)
+
+    //  old head
+    int ret;
+    printf("--------------------------------------------------[update_old_head]\n");
+    sprintf(sql,"update %s set isDiff=%d, full_data=null, full_byteCount=null, full_schemaCode=null, minus_data='%s', minus_byteCount=%d, minus_schemaCode=%d",rid_head,TRUE,res_minus,minus_len,schemaCode);
+    printf("SQL: %s\n",sql);
+    ret = sendCommand(sql);
+    
+    if (ret!=0){
+        printf("saveNewDataContentByID..FAILED(update_old_head)\n");
+        free(rid_head);
+        free(res_plus);
+        free(res_minus);
+        free(res_full);
+        return -1;
+    }
+    
+    //  new head
+    short nhead_cltid;
+    long nhead_rid;
+    printf("--------------------------------------------------[create_new_vertex]\n");
+    sprintf(sql,"CREATE VERTEX DataContent set isDiff=%d, SHA256hashCode='default-hash', full_data='%s', full_byteCount=%d, full_schemaCode=%d, plus_data='%s', plus_byteCount=%d, plus_schemaCode=%d",FALSE,res_full,full_len,schemaCode,res_plus,plus_len,schemaCode);
+    printf("SQL: %s\n",sql);
+    ret = createVertex(sql,&nhead_cltid,&nhead_rid);
+    
+    if (ret!=0){
+        printf("saveNewDataContentByID..FAILED(create_new_vertex)\n");
+        free(rid_head);
+        free(res_plus);
+        free(res_minus);
+        free(res_full);
+        return -1;
+    }
+    
+    free(res_plus);
+    free(res_minus);
+    free(res_full);
+    
+    //  delete edge (head/current)
+    printf("--------------------------------------------------[delete_edge_head/current]\n");
+    sprintf(sql,"delete EDGE toDataContent from (select from (select expand(out('toDataHolder')) from Data where dataID='%s')) to %s where type='head' or type='current'",dataID,rid_head);
+    printf("SQL: %s\n",sql);
+    ret = sendCommand(sql);
+    
+    if (ret!=0){
+        printf("saveNewDataContentByID..FAILED(delete_edge_head/current)\n");
+        free(rid_head);
+        return -1;
+    }
+    
+    //  create edge (head/current)
+    printf("--------------------------------------------------[create_edge_toDataContent_head]\n");
+    sprintf(sql,"CREATE EDGE toDataContent from (select from (select expand(out('toDataHolder')) from Data where dataID='%s')) to #%d:%lu set type='head'",dataID,nhead_cltid,nhead_rid);
+    printf("SQL: %s\n",sql);
+    ret = sendCommand(sql);
+    
+    if (ret!=0){
+        printf("saveNewDataContentByID..FAILED(edge_toDataContent_head)\n");
+        free(rid_head);
+        return -1;
+    }
+    
+    printf("--------------------------------------------------[create_edge_toDataContent_current]\n");
+    sprintf(sql,"CREATE EDGE toDataContent from (select from (select expand(out('toDataHolder')) from Data where dataID='%s')) to #%d:%lu set type='current'",dataID,nhead_cltid,nhead_rid);
+    printf("SQL: %s\n",sql);
+    ret = sendCommand(sql);
+    
+    if (ret!=0){
+        printf("saveNewDataContentByID..FAILED(edge_toDataContent_current)\n");
+        free(rid_head);
+        return -1;
+    }
+    
+    //  create edge (next/pre)
+    printf("--------------------------------------------------[create_edge_toContent_Pre]\n");
+    sprintf(sql,"CREATE EDGE toContent from #%d:%lu to %s set type='pre'",nhead_cltid,nhead_rid,rid_head);
+    printf("SQL: %s\n",sql);
+    ret = sendCommand(sql);
+    
+    if (ret!=0){
+        printf("saveNewDataContentByID..FAILED(edge_toContent_Pre)\n");
+        free(rid_head);
+        return -1;
+    }
+
+    printf("--------------------------------------------------[create_edge_toContent_Next]\n");
+    sprintf(sql,"CREATE EDGE toContent from %s to #%d:%lu set type='next'",rid_head,nhead_cltid,nhead_rid);
+    printf("SQL: %s\n",sql);
+    ret = sendCommand(sql);
+    
+    if (ret!=0){
+        printf("saveNewDataContentByID..FAILED(edge_toContent_Next)\n");
+        free(rid_head);
+        return -1;
+    }
+    
+    //  toDataHolder_fromDC
+    printf("--------------------------------------------------[create_edge_toDataHolder_fromDC]\n");
+    sprintf(sql,"CREATE EDGE toDataHolder_fromDC from #%d:%lu to (select from (select expand(out('toDataHolder')) from Data where dataID='%s'))",nhead_cltid,nhead_rid,dataID);
+    printf("SQL: %s\n",sql);
+    ret = sendCommand(sql);
+    
+    if (ret!=0){
+        printf("saveNewDataContentByID..FAILED(edge_toDataHolder_fromDC)\n");
+        free(rid_head);
+        return -1;
+    }
+    
+    free(rid_head);
+    return 0;
+}
+
 Text getTagContentWithName(ObjectBinary* fullContent, char* tagName, char* id){
     char* full_xml = strdup(fullContent->data);
     ezxml_t root = ezxml_parse_str(full_xml,strlen(full_xml));
@@ -4130,7 +4322,7 @@ void testCRUD(Data** data){
 //    printf("bl2: %d\n",bl2);
 //-------------------------------------------------------------------------
 //    Schema test_schema[]="<root><attachmentFTOLinks></attachmentFTOLinks><book_id></book_id><author></author><title></title><genre></genre><price></price></root>";
-//    const char* uuid_org = createOrg("Throughwave",test_schema);
+//    const char* uuid_org = createOrg("Exxon",test_schema);
 //    addUser2OrgByID((char*)uuid_org,"A99B27E341CA424D84FADCCB5B856910");
 
 //----[6]------------------------------------------------------------------
@@ -4158,8 +4350,8 @@ void testCRUD(Data** data){
 //-------------------------------------------------------------------------
 
 //----[7]------------------------------------------------------------------
-//    ObjectBinary *obj_h = getDataContentByID("4EC579D4402740A19D1DADA9542D38E5");
-//    ObjectBinary *obj_l = getDataContentLastestCommonByID("4EC579D4402740A19D1DADA9542D38E5");
+//    ObjectBinary *obj_h = getDataContentByID("9956F26257E54272A33902A1E4309D42");
+//    ObjectBinary *obj_l = getDataContentLastestCommonByID("9956F26257E54272A33902A1E4309D42");
 //    printf("\n--- getDataContentByID ---\n");
 //    if(obj_h != NULL){
 //        printf("schemaCode: %d\n",obj_h->schemaCode);
@@ -4228,7 +4420,7 @@ void testCRUD(Data** data){
 //-------------------------------------------------------------------------
 
 //----[12]-----------------------------------------------------------------
-//    ObjectBinary *obj_p = getContentPreVerByID("AB461924401F4B98B3DBB183CA9FEA50");
+//    ObjectBinary *obj_p = getContentPreVerByID("9956F26257E54272A33902A1E4309D42");
 //    if(obj_p != NULL){
 //        printf("schemaCode: %d\n",obj_p->schemaCode);
 //        printf("byteCount: %d\n",obj_p->byteCount);
@@ -4252,10 +4444,17 @@ void testCRUD(Data** data){
 //-------------------------------------------------------------------------
     
 //----[14]-----------------------------------------------------------------
-//    char* value = getDataContentWithTagByID("AB461924401F4B98B3DBB183CA9FEA50","author",NULL);
-//    printf("val: %s\n",value);
+//    char* value = getDataContentWithTagByID("9956F26257E54272A33902A1E4309D42","author",NULL);
+//    printf("value: %s\n",value);
 //    free(value);
 //-------------------------------------------------------------------------
+    
+//----[15]-----------------------------------------------------------------
+//    char new_xml2[]="<root><attachmentFTOLinks></attachmentFTOLinks><book_id></book_id><author>Pimpat Teo</author><title>C-coding-book2</title><genre></genre><price>200</price></root>";
+//    int x = saveNewDataContentByID("9956F26257E54272A33902A1E4309D42",new_xml2);
+//    int x = saveNewDataContentByID((char*)uuid_org,new_xml2);
+//-------------------------------------------------------------------------
+    
     disconnectServer();
     close(Sockfd);
 }
