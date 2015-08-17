@@ -170,6 +170,8 @@ int reqCommandMsg(char *message, char *className, char *command) {
 }
 
 int reqQueryMsg(char *message, char *className, char *query) {
+//    printf("reqQueryMsg\n");
+//    printf("query: %s\n",query);
     int size = 0;
     size += addByte('s', message+size);
     size += addString(className, message+size+sizeof(int));
