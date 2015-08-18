@@ -30,7 +30,7 @@
 #define MAX_SQL_SIZE (10000)
 #define MAX_DIFF_SIZE (1000)
 #define MAX_CONTENT_SIZE (10000)
-#define VER_KEEPED (5)
+#define VER_KEEPED (10)
 
 #define TRUE 1
 #define FALSE 0
@@ -118,13 +118,12 @@ extern Data* mydata;
 Data* mydata = NULL;
 
 enum DATATYPE {
-    _data,
-    _subTask,
-    _task,
-    _state,
-    _category,
+    _org,
     _user,
-    _org
+    _category,
+    _state,
+    _task,
+    _subTask
 };
 
 enum EDGETYPE {
@@ -277,6 +276,7 @@ void test_getData(Data** data);
 void testCRUD(Data** data);
 void freeData(Data* data);
 void freeObjBinary(ObjectBinary* obj);
+char* buildStringFromData(Data* data);
 
 std::string& replace(std::string& s, const std::string& from, const std::string& to);
 int main() {
@@ -4366,30 +4366,32 @@ void testCRUD(Data** data){
 //-------------------------------------------------------------------------
 //    Schema test_schema[]="<root><attachmentFTOLinks></attachmentFTOLinks><book_id></book_id><author></author><title></title><genre></genre><price></price></root>";
 //    const char* uuid_org = createOrg("Exxon",test_schema);
-//    addUser2OrgByID((char*)uuid_org,"A99B27E341CA424D84FADCCB5B856910");
+//    addUser2OrgByID("12F5B1ED18BF470AB0F22A5CE571D379","8025B5A5A68F4285AF58FEEB0A32CFFA",&dtPacket);
 
 //----[6]------------------------------------------------------------------[ts]
-//    Data* q_data = queryDataByID("AB461924401F4B98B3DBB183CA9FEA50",&dtPacket);
-////    Data* q_data = queryDataByID("2603169373904B9FBF05F72620D70F3D",&dtPacket);
-//    printf("\n--- query Data ---\n");
-//    printf("dataID: %s\n", q_data->dataID);
-//    printf("dataName: %s\n", q_data->dataName);
-//    printf("dataType: %d\n", q_data->dataType);
-//    printf("chatRoom: %s\n", q_data->chatRoom);
-//    printf("versionKeeped: %d\n", q_data->content->versionKeeped);
-//    
-//    if(q_data->content->head->fullContent != NULL)
-//        printf("head: %s\n", q_data->content->head->fullContent->data);
-//    if(q_data->content->lastestCommon->minusPatch != NULL)
-//        printf("last(minus): %s\n", q_data->content->lastestCommon->minusPatch->data);
-//    if(q_data->content->lastestCommon->fullContent != NULL)
-//        printf("last(full): %s\n", q_data->content->lastestCommon->fullContent->data);
-//    
-//    int count_dc = countDataContent(q_data);
-//    printf("count_dc: %d\n",count_dc-1);
-//    
-//    /* free Data */
-//    freeData(q_data);
+    Data* q_data = queryDataByID("AB461924401F4B98B3DBB183CA9FEA50",&dtPacket);
+//    Data* q_data = queryDataByID("2603169373904B9FBF05F72620D70F3D",&dtPacket);
+    printf("\n--- query Data ---\n");
+    printf("dataID: %s\n", q_data->dataID);
+    printf("dataName: %s\n", q_data->dataName);
+    printf("dataType: %d\n", q_data->dataType);
+    printf("chatRoom: %s\n", q_data->chatRoom);
+    printf("versionKeeped: %d\n", q_data->content->versionKeeped);
+    
+    if(q_data->content->head->fullContent != NULL)
+        printf("head: %s\n", q_data->content->head->fullContent->data);
+    if(q_data->content->lastestCommon->minusPatch != NULL)
+        printf("last(minus): %s\n", q_data->content->lastestCommon->minusPatch->data);
+    if(q_data->content->lastestCommon->fullContent != NULL)
+        printf("last(full): %s\n", q_data->content->lastestCommon->fullContent->data);
+    
+    int count_dc = countDataContent(q_data);
+    printf("count_dc: %d\n",count_dc-1);
+    
+    char* strPack = buildStringFromData(q_data);
+    
+    /* free Data */
+    freeData(q_data);
 //-------------------------------------------------------------------------
 
 //----[7]------------------------------------------------------------------[ts]
@@ -4499,8 +4501,10 @@ void testCRUD(Data** data){
 //-------------------------------------------------------------------------
     
 //----[16]-----------------------------------------------------------------[ts]
-    int y = removeTaskFromState("9ABA072021954B6C8124CA23D3F4529E","50CFEBD64BFA49A1976B5E7A46691A7A",&dtPacket);
+//    int y = removeTaskFromState("9ABA072021954B6C8124CA23D3F4529E","50CFEBD64BFA49A1976B5E7A46691A7A",&dtPacket);
 //-------------------------------------------------------------------------
+
+//    Org** org = queryOrgFromData("E4DEA39D5E7646918E07B414C2CC0671",&dtPacket);
     
     disconnectServer(&dtPacket);
     close(dtPacket.Sockfd);
@@ -4548,4 +4552,10 @@ void freeObjBinary(ObjectBinary* obj){
     free(obj->data);
     free(obj);
 }
+
+char* buildStringFromData(Data* data){
+    printf("--- buildStringFromData ---\n");
+    return NULL;
+}
+
 
