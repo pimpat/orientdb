@@ -118,12 +118,12 @@ extern Data* mydata;
 Data* mydata = NULL;
 
 enum DATATYPE {
-    _org,
-    _user,
-    _category,
-    _state,
-    _task,
-    _subTask
+    _org,       //  0
+    _user,      //  1
+    _category,  //  2
+    _state,     //  3
+    _task,      //  4
+    _subTask    //  5
 };
 
 enum EDGETYPE {
@@ -277,6 +277,7 @@ void testCRUD(Data** data);
 void freeData(Data* data);
 void freeObjBinary(ObjectBinary* obj);
 char* buildStringFromData(Data* data);
+Data* buildDatafromString(char* strPack);
 
 std::string& replace(std::string& s, const std::string& from, const std::string& to);
 int main() {
@@ -4109,7 +4110,7 @@ void test_setNewData(){
     setNewDataDiffWithTag(_mydata, "price", NULL, diff_price);
     setNewDataDiffWithTag(_mydata, "titel", NULL, "hello");
     
-    setDataName(_mydata, "myTask2");
+    setDataName(_mydata, "_myTask2");
     printf("dataName: %s\n",_mydata->dataName);
     setChatRoom(_mydata, "chat-room");
     printf("chatRoom: %s\n",_mydata->chatRoom);
@@ -4389,6 +4390,7 @@ void testCRUD(Data** data){
     printf("count_dc: %d\n",count_dc-1);
     
     char* strPack = buildStringFromData(q_data);
+    free(strPack);
     
     /* free Data */
     freeData(q_data);
@@ -4555,7 +4557,134 @@ void freeObjBinary(ObjectBinary* obj){
 
 char* buildStringFromData(Data* data){
     printf("--- buildStringFromData ---\n");
-    return NULL;
+    
+    char* strPack = (char*)malloc(sizeof(char)*20000);
+    char temp[10];
+    
+    //  dataID
+    strcat(strPack,data->dataID);
+    strcat(strPack,":");
+    
+    //  dataName
+    strcat(strPack,data->dataName);
+    strcat(strPack,":");
+    
+    //  dataType
+    sprintf(temp,"%d:",data->dataType);
+    strcat(strPack,temp);
+    
+    //  chatRoom
+    if(data->chatRoom!=NULL){
+        strcat(strPack, data->chatRoom);
+    }
+    else{
+        strcat(strPack,"NULL");
+    }
+    strcat(strPack,":");
+    
+    //  versionKeeped
+    sprintf(temp,"%d:",data->content->versionKeeped);
+    strcat(strPack,temp);
+    
+    //  num content
+    int count = countDataContent(data);
+    count--;
+    printf("count: %d\n",count);
+    sprintf(temp,"%d:",count);
+    strcat(strPack,temp);
+    
+    int i=1;
+    DataContent *mydc, *next_mydc;
+    for(mydc=data->content->lastestCommon;mydc!=NULL;mydc=next_mydc){
+        next_mydc = mydc->nextVersion;
+        
+        //  ver content
+        sprintf(temp,"%d:",i);
+        strcat(strPack,temp);
+        
+        //  isDiff
+        if(mydc->isDiff == TRUE){
+            strcat(strPack,"T:");
+        }
+        else{
+            strcat(strPack,"F:");
+        }
+        
+        //  SHA256hashCode
+        if(mydc->SHA256hashCode != NULL){
+//            printf("hash: %s\n",mydc->SHA256hashCode);
+            strcat(strPack,mydc->SHA256hashCode);
+            strcat(strPack,":");
+        }
+        else{
+            strcat(strPack,"NULL:");
+        }
+        
+        //  timeStamp
+        strcat(strPack,"NULL:");
+        
+        //  minus
+        if(mydc->minusPatch != NULL){
+            sprintf(temp,"%d:",mydc->minusPatch->byteCount);
+            strcat(strPack,temp);
+            
+            sprintf(temp,"%d:",mydc->minusPatch->schemaCode);
+            strcat(strPack,temp);
+            
+//            printf("data: %s\n",mydc->minusPatch->data);
+            strcat(strPack,mydc->minusPatch->data);
+            strcat(strPack,":");
+        }
+        else{
+            strcat(strPack,"NULL:");
+        }
+        
+        //  plus
+        if(mydc->plusPatch != NULL){
+            sprintf(temp,"%d:",mydc->plusPatch->byteCount);
+            strcat(strPack,temp);
+            
+            sprintf(temp,"%d:",mydc->plusPatch->schemaCode);
+            strcat(strPack,temp);
+            
+            strcat(strPack,mydc->plusPatch->data);
+            strcat(strPack,":");
+        }
+        else{
+            strcat(strPack,"NULL:");
+        }
+        
+        //  full
+        if(mydc->fullContent != NULL){
+            sprintf(temp,"%d:",mydc->fullContent->byteCount);
+            strcat(strPack,temp);
+            
+            sprintf(temp,"%d:",mydc->fullContent->schemaCode);
+            strcat(strPack,temp);
+            
+            strcat(strPack,mydc->fullContent->data);
+            strcat(strPack,":");
+        }
+        else{
+            strcat(strPack,"NULL:");
+        }
+        
+        i++;
+    }
+    strPack[strlen(strPack)-1] ='\0';
+    printf("len: %d\n",strlen(strPack));
+    printf("\n\n%s\n\n\n",strPack);
+    
+    return strPack;
 }
+
+Data* buildDatafromString(char* strPack){
+    char* token;
+    Data* dt = (Data*)malloc(sizeof(Data));
+    token = strtok(strPack,":");
+    dt->dataID = strdup(token);
+    return dt;
+}
+
 
 

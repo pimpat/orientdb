@@ -24,7 +24,7 @@ SRC_C = main.cpp
 ################################################
 
 bin:dep
-	$(CC) $(BUILD_FLAG) -I$(INCLUDE_DIR) -o $(BIN_DIR)main.o $(SRC_DIR)$(SRC_C)
+	$(CC) $(DEBUG_FLAG) -I$(INCLUDE_DIR) -o $(BIN_DIR)main.o $(SRC_DIR)$(SRC_C)
 	$(CC) -o $(BIN_DIR)$(OUTPUT_O) $(DEPEN_FILE) $(BIN_DIR)main.o
 	# g++ -w -c -g -I$(INCLUDE_DIR) main.cpp && g++ -o main main.o reqmsg.o swap_endian.o dmp.o ezxml.o && ./main
 
