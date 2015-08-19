@@ -278,6 +278,9 @@ void testCRUD(Data** data);
 void freeData(Data* data);
 void freeObjBinary(ObjectBinary* obj);
 
+char* genString(Data* data);
+char* genMsg(Data* data);
+
 std::string& replace(std::string& s, const std::string& from, const std::string& to);
 int main() {
     /*
@@ -430,133 +433,23 @@ int main() {
                 strcat(new_uuid, "A2C75A6CFCAD4B9986CEFEE70B97330C");
                 strcat(msg, "Task");
             }
-
             
-            // printf(">>%s\n", new_uuid);
-            char allVer_str[10000] = "";
-            
-            if (new_uuid != NULL)
-            {
-                Data* dData = queryDataByID(new_uuid, &dtPacket);
-                printf("--->%s\n", dData->dataID);
-                printf("--->%s\n", dData->dataName);
-                printf("--->%d\n", dData->dataType);
-                printf("--->%s\n", dData->chatRoom);
-                printf("----------\n");
-                printf("-->%d\n", dData->content->versionKeeped);
-                printf("----------\n");
-                printf("SHA : %s\n", dData->content->lastestCommon->SHA256hashCode);
-                printf("Stamp : %s\n", dData->content->lastestCommon->timeStamp);
-                printf("isDiff : %d\n", dData->content->lastestCommon->isDiff);
-                printf("----------\n");
+            Data* dData = queryDataByID(new_uuid, &dtPacket);
+            printf("--->%s\n", dData->dataID);
+            printf("--->%s\n", dData->dataName);
+            printf("--->%d\n", dData->dataType);
+            printf("--->%s\n", dData->chatRoom);
+            printf("----------\n");
+            printf("-->%d\n", dData->content->versionKeeped);
+            printf("----------\n");
+            printf("SHA : %s\n", dData->content->lastestCommon->SHA256hashCode);
+            printf("Stamp : %s\n", dData->content->lastestCommon->timeStamp);
+            printf("isDiff : %d\n", dData->content->lastestCommon->isDiff);
+            printf("----------\n");
 
-                DataContent* cont = dData->content->lastestCommon;
-                
-                char diff[500];
-                char ts[500];
-                char schema[500];
-                char byte[500];
-                char dat[3000];
-                char type[100];
-                char verKeep[100];
-
-                sprintf(type, "%d", dData->dataType);
-                sprintf(verKeep, "%d", dData->content->versionKeeped);
-
-                strcat(allVer_str, dData->dataName);
-                strcat(allVer_str, ":");
-                strcat(allVer_str, dData->dataID);
-                strcat(allVer_str, ":");
-                strcat(allVer_str, type);
-                strcat(allVer_str, ":");
-                if(dData->chatRoom != NULL){strcat(allVer_str, dData->chatRoom);}else{strcat(allVer_str, "(NULL)");}
-                strcat(allVer_str, ":");
-                strcat(allVer_str, verKeep);
-                strcat(allVer_str, ":");
-
-                while (cont != NULL)
-                {
-                    strcat(allVer_str, cont->SHA256hashCode);
-                    strcat(allVer_str, ":");
-                    sprintf(ts, "%s", cont->timeStamp);
-                    strcat(allVer_str, ts);
-                    strcat(allVer_str, ":");
-                    sprintf(diff, "%d", cont->isDiff);
-                    strcat(allVer_str, diff);
-                    strcat(allVer_str, ":");
-                    if (cont->fullContent != NULL)
-                    {
-                        sprintf(schema, "%d", cont->fullContent->schemaCode);
-                        sprintf(byte, "%d", cont->fullContent->byteCount);
-                        sprintf(dat, "%s", cont->fullContent->data);
-                        strcat(allVer_str, schema);
-                        strcat(allVer_str, ":");
-                        strcat(allVer_str, byte);
-                        strcat(allVer_str, ":");
-                        strcat(allVer_str, dat);
-                        strcat(allVer_str, ":");
-                    }
-                    else{
-                        strcat(allVer_str, "(NULL)");
-                        strcat(allVer_str, ":");
-                        strcat(allVer_str, "(NULL)");
-                        strcat(allVer_str, ":");
-                        strcat(allVer_str, "(NULL)");
-                        strcat(allVer_str, ":");
-                    }
-
-                    if (cont->minusPatch != NULL)
-                    {
-                        sprintf(schema, "%d", cont->minusPatch->schemaCode);
-                        sprintf(byte, "%d", cont->minusPatch->byteCount);
-                        sprintf(dat, "%s", cont->minusPatch->data);
-                        strcat(allVer_str, schema);
-                        strcat(allVer_str, ":");
-                        strcat(allVer_str, byte);
-                        strcat(allVer_str, ":");
-                        strcat(allVer_str, dat);
-                        strcat(allVer_str, ":");
-                    }
-                    else{
-                        strcat(allVer_str, "(NULL)");
-                        strcat(allVer_str, ":");
-                        strcat(allVer_str, "(NULL)");
-                        strcat(allVer_str, ":");
-                        strcat(allVer_str, "(NULL)");
-                        strcat(allVer_str, ":");
-                    }
-
-                    if (cont->plusPatch != NULL)
-                    {
-                        sprintf(schema, "%d", cont->plusPatch->schemaCode);
-                        sprintf(byte, "%d", cont->plusPatch->byteCount);
-                        sprintf(dat, "%s", cont->plusPatch->data);
-                        strcat(allVer_str, schema);
-                        strcat(allVer_str, ":");
-                        strcat(allVer_str, byte);
-                        strcat(allVer_str, ":");
-                        strcat(allVer_str, dat);
-                        strcat(allVer_str, ":");
-                    }
-                    else{
-                        strcat(allVer_str, "(NULL)");
-                        strcat(allVer_str, ":");
-                        strcat(allVer_str, "(NULL)");
-                        strcat(allVer_str, ":");
-                        strcat(allVer_str, "(NULL)");
-                        strcat(allVer_str, ":");
-                    }
-
-                    cont = cont->nextVersion;
-                }
-
-
-                //free(dData);
-                //printf("%s\n", allVer_str);
-
-            }
+            char* strDT = genString(dData);
             char rep_str[10000];
-            sprintf(rep_str, "1:%s:%s", msg, allVer_str);
+            sprintf(rep_str, "1:%s:%s", msg, strDT);
             printf("%s\n", rep_str);
             s_send(responder, rep_str);
 
@@ -566,17 +459,15 @@ int main() {
             // free(state_uuid);
             // free(task_uuid);
             // free(subtask_uuid);
+            // free(dData);
         }
         else if(numtype == 2){
             // edit and save Data
-            char msg[10] = "";
             token = strtok(NULL,":");
             char *id = strdup(token);
             token = strtok(NULL,":");
             char *content = strdup(token);
             saveNewDataContentByID(id, content, &dtPacket);
-
-            char allVer_str[10000] = "";
 
             Data* dData = queryDataByID(id, &dtPacket);
             printf("--->%s\n", dData->dataID);
@@ -591,114 +482,11 @@ int main() {
             printf("isDiff : %d\n", dData->content->lastestCommon->isDiff);
             printf("----------\n");
 
-            if (dData->dataType == 6){strcat(msg, "Org");}
-            else if (dData->dataType == 5){strcat(msg, "User");}
-            else if (dData->dataType == 4){strcat(msg, "Category");}
-            else if (dData->dataType == 3){strcat(msg, "State");}
-            else if (dData->dataType == 2){strcat(msg, "Task");}
-            else if (dData->dataType == 1){strcat(msg, "Subtask");}
-
-            DataContent* cont = dData->content->lastestCommon;
-
-            char diff[500];
-            char ts[500];
-            char schema[500];
-            char byte[500];
-            char dat[3000];
-            char type[100];
-            char verKeep[100];
-
-            sprintf(type, "%d", dData->dataType);
-            sprintf(verKeep, "%d", dData->content->versionKeeped);
-
-            strcat(allVer_str, dData->dataName);
-            strcat(allVer_str, ":");
-            strcat(allVer_str, dData->dataID);
-            strcat(allVer_str, ":");
-            strcat(allVer_str, type);
-            strcat(allVer_str, ":");
-            if(dData->chatRoom != NULL){strcat(allVer_str, dData->chatRoom);}else{strcat(allVer_str, "(NULL)");}
-            strcat(allVer_str, ":");
-            strcat(allVer_str, verKeep);
-            strcat(allVer_str, ":");
-
-            while (cont != NULL)
-            {
-                strcat(allVer_str, cont->SHA256hashCode);
-                strcat(allVer_str, ":");
-                sprintf(ts, "%s", cont->timeStamp);
-                strcat(allVer_str, ts);
-                strcat(allVer_str, ":");
-                sprintf(diff, "%d", cont->isDiff);
-                strcat(allVer_str, diff);
-                strcat(allVer_str, ":");
-                if (cont->fullContent != NULL)
-                {
-                    sprintf(schema, "%d", cont->fullContent->schemaCode);
-                    sprintf(byte, "%d", cont->fullContent->byteCount);
-                    sprintf(dat, "%s", cont->fullContent->data);
-                    strcat(allVer_str, schema);
-                    strcat(allVer_str, ":");
-                    strcat(allVer_str, byte);
-                    strcat(allVer_str, ":");
-                    strcat(allVer_str, dat);
-                    strcat(allVer_str, ":");
-                }
-                else{
-                    strcat(allVer_str, "(NULL)");
-                    strcat(allVer_str, ":");
-                    strcat(allVer_str, "(NULL)");
-                    strcat(allVer_str, ":");
-                    strcat(allVer_str, "(NULL)");
-                    strcat(allVer_str, ":");
-                }
-
-                if (cont->minusPatch != NULL)
-                {
-                    sprintf(schema, "%d", cont->minusPatch->schemaCode);
-                    sprintf(byte, "%d", cont->minusPatch->byteCount);
-                    sprintf(dat, "%s", cont->minusPatch->data);
-                    strcat(allVer_str, schema);
-                    strcat(allVer_str, ":");
-                    strcat(allVer_str, byte);
-                    strcat(allVer_str, ":");
-                    strcat(allVer_str, dat);
-                    strcat(allVer_str, ":");
-                }
-                else{
-                    strcat(allVer_str, "(NULL)");
-                    strcat(allVer_str, ":");
-                    strcat(allVer_str, "(NULL)");
-                    strcat(allVer_str, ":");
-                    strcat(allVer_str, "(NULL)");
-                    strcat(allVer_str, ":");
-                }
-
-                if (cont->plusPatch != NULL)
-                {
-                    sprintf(schema, "%d", cont->plusPatch->schemaCode);
-                    sprintf(byte, "%d", cont->plusPatch->byteCount);
-                    sprintf(dat, "%s", cont->plusPatch->data);
-                    strcat(allVer_str, schema);
-                    strcat(allVer_str, ":");
-                    strcat(allVer_str, byte);
-                    strcat(allVer_str, ":");
-                    strcat(allVer_str, dat);
-                    strcat(allVer_str, ":");
-                }
-                else{
-                    strcat(allVer_str, "(NULL)");
-                    strcat(allVer_str, ":");
-                    strcat(allVer_str, "(NULL)");
-                    strcat(allVer_str, ":");
-                    strcat(allVer_str, "(NULL)");
-                    strcat(allVer_str, ":");
-                }
-
-                cont = cont->nextVersion;
-            }
+            char* strDT = genString(dData);
+            char* msg = genMsg(dData);
+            
             char rep_str[10000];
-            sprintf(rep_str, "1:%s:%s", msg, allVer_str);
+            sprintf(rep_str, "1:%s:%s", msg, strDT);
             printf("%s\n", rep_str);
             s_send(responder, rep_str);
 
@@ -709,26 +497,36 @@ int main() {
             s_send(responder, "test");
         }
         else if(numtype == 4){
-            char uuid[100] = "ADE6EA3EDC1D4119A9B66AE3B7705F0A";
+            //char uuid[100] = "ADE6EA3EDC1D4119A9B66AE3B7705F0A";
+            token = strtok(NULL,":");
+            char *id = strdup(token);
             printf(">>>>> Query function <<<<<\n");
+
             // Org** ddt = queryOrgFromData(uuid, &dtPacket);
             // User** ddt = queryAllUsersFromData(uuid, &dtPacket);
             // Category** ddt = queryAllCategoriesFromData(uuid,&dtPacket);
             // State** ddt = queryAllStatesFromData(uuid, &dtPacket);
-            Task** ddt = queryAllTasksFromData(uuid, &dtPacket);
+            // Task** ddt = queryAllTasksFromData(uuid, &dtPacket);
             // SubTask** ddt = queryAllSubTasksFromData(uuid, &dtPacket);
-            for (int i = 0; ddt[i] != NULL; ++i)
-            {
-                printf("------------- %d ---------------\n", i);
-                printf("DataID: %s\n", ddt[i]->dataID);
-                printf("DataID: %s\n", ddt[i]->dataName);
-                printf("DataID: %d\n", ddt[i]->dataType);
-                printf("--------------------------------\n");
+            // for (int i = 0; ddt[i] != NULL; ++i)
+            // {
+            //     printf("------------- %d ---------------\n", i);
+            //     printf("DataID: %s\n", ddt[i]->dataID);
+            //     printf("DataNane: %s\n", ddt[i]->dataName);
+            //     printf("DataType: %d\n", ddt[i]->dataType);
+            //     printf("--------------------------------\n");
 
-            }
+            // }
 
+            Data *data = queryDataByID(id, &dtPacket);
+            char* strDT = genString(data);
+            char* msg = genMsg(data);
+            printf("-=-=-=-=-=- %s\n", msg);
+            char rep_str[10000];
+            sprintf(rep_str, "1:%s:%s", msg, strDT);
             printf(">>>>> Finished Query <<<<<\n");
-            s_send(responder, "test");
+            printf("%s\n", rep_str);
+            s_send(responder, rep_str);
         }
         else if(numtype == 5){
             // Clone Data
@@ -4976,6 +4774,120 @@ void testCRUD(Data** data){
     disconnectServer(&dtPacket);
     close(dtPacket.Sockfd);
 }
+
+char* genString(Data* data){
+    DataContent* cont = data->content->lastestCommon;
+
+    char allVer_str[10000] = "";
+    char diff[500];
+    char ts[500];
+    char schema[500];
+    char byte[500];
+    char dat[3000];
+    char type[100];
+    char verKeep[100];
+
+    sprintf(type, "%d", data->dataType);
+    sprintf(verKeep, "%d", data->content->versionKeeped);
+
+    strcat(allVer_str, data->dataName);
+    strcat(allVer_str, ":");
+    strcat(allVer_str, data->dataID);
+    strcat(allVer_str, ":");
+    strcat(allVer_str, type);
+    strcat(allVer_str, ":");
+    if(data->chatRoom != NULL){strcat(allVer_str, data->chatRoom);}else{strcat(allVer_str, "(NULL)");}
+    strcat(allVer_str, ":");
+    strcat(allVer_str, verKeep);
+    strcat(allVer_str, ":");
+
+    while (cont != NULL)
+    {
+        strcat(allVer_str, cont->SHA256hashCode);
+        strcat(allVer_str, ":");
+        sprintf(ts, "%s", cont->timeStamp);
+        strcat(allVer_str, ts);
+        strcat(allVer_str, ":");
+        sprintf(diff, "%d", cont->isDiff);
+        strcat(allVer_str, diff);
+        strcat(allVer_str, ":");
+        if (cont->fullContent != NULL)
+        {
+            sprintf(schema, "%d", cont->fullContent->schemaCode);
+            sprintf(byte, "%d", cont->fullContent->byteCount);
+            sprintf(dat, "%s", cont->fullContent->data);
+            strcat(allVer_str, schema);
+            strcat(allVer_str, ":");
+            strcat(allVer_str, byte);
+            strcat(allVer_str, ":");
+            strcat(allVer_str, dat);
+            strcat(allVer_str, ":");
+        }
+        else{
+            strcat(allVer_str, "(NULL)");
+            strcat(allVer_str, ":");
+            strcat(allVer_str, "(NULL)");
+            strcat(allVer_str, ":");
+            strcat(allVer_str, "(NULL)");
+            strcat(allVer_str, ":");
+        }
+
+        if (cont->minusPatch != NULL)
+        {
+            sprintf(schema, "%d", cont->minusPatch->schemaCode);
+            sprintf(byte, "%d", cont->minusPatch->byteCount);
+            sprintf(dat, "%s", cont->minusPatch->data);
+            strcat(allVer_str, schema);
+            strcat(allVer_str, ":");
+            strcat(allVer_str, byte);
+            strcat(allVer_str, ":");
+            strcat(allVer_str, dat);
+            strcat(allVer_str, ":");
+        }
+        else{
+            strcat(allVer_str, "(NULL)");
+            strcat(allVer_str, ":");
+            strcat(allVer_str, "(NULL)");
+            strcat(allVer_str, ":");
+            strcat(allVer_str, "(NULL)");
+            strcat(allVer_str, ":");
+        }
+
+        if (cont->plusPatch != NULL)
+        {
+            sprintf(schema, "%d", cont->plusPatch->schemaCode);
+            sprintf(byte, "%d", cont->plusPatch->byteCount);
+            sprintf(dat, "%s", cont->plusPatch->data);
+            strcat(allVer_str, schema);
+            strcat(allVer_str, ":");
+            strcat(allVer_str, byte);
+            strcat(allVer_str, ":");
+            strcat(allVer_str, dat);
+            strcat(allVer_str, ":");
+        }
+        else{
+            strcat(allVer_str, "(NULL)");
+            strcat(allVer_str, ":");
+            strcat(allVer_str, "(NULL)");
+            strcat(allVer_str, ":");
+            strcat(allVer_str, "(NULL)");
+            strcat(allVer_str, ":");
+        }
+
+        cont = cont->nextVersion;
+    }
+    return allVer_str;
+}
+
+char* genMsg(Data* data){
+    if (data->dataType == 6){return "Org";}
+    else if (data->dataType == 5){return "User";}
+    else if (data->dataType == 4){return "Category";}
+    else if (data->dataType == 3){return "State";}
+    else if (data->dataType == 2){return "Task";}
+    else if (data->dataType == 1){return "Subtask";}
+}
+
 
 void freeData(Data* data){
     int i=0;

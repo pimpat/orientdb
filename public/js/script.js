@@ -157,14 +157,14 @@ socket.on('created', function(data) {
         child2 += "<ul>";
         child2 += "<li><a href='#'>SchemaCode : "+minus1+"</a></li>";
         child2 += "<li><a href='#'>byteCount : "+minus2+"</a></li>";
-        child2 += "<li><a href='#'>data : <xmp>"+minus3+"</xmp></a></li>";
+        child2 += "<li>data : <xmp>"+minus3+"</xmp></li>";
         child2 += "</ul>";
         child2 += "</li>";
         child2 += "<li id='plusdata-"+dataID+"'><a href='#'>Plus</a>";
         child2 += "<ul>";
         child2 += "<li><a href='#'>SchemaCode : "+plus1+"</a></li>";
         child2 += "<li><a href='#'>byteCount : "+plus2+"</a></li>";
-        child2 += "<li><a href='#'>data : <xmp>"+plus3+"</xmp></a></li>";
+        child2 += "<li>data : <xmp>"+plus3+"</xmp></li>";
         child2 += "</ul>";
         child2 += "</li>";
         child2 += "</ul>";
@@ -249,6 +249,7 @@ function req(val){
     var name = $("#loginName").val();    
     socket.emit('login', name);
     $(".cloneBox").removeClass("none");
+    $(".queryBox").removeClass("none");
     $("#loginName").val("Login as "+name);
     $("#loginName").attr("disabled", "disabled");
     $(".loginBox button").attr("disabled", "disabled");
@@ -258,6 +259,11 @@ function req(val){
     var dataid = $("#selectId").val();
     var toUsername = $("#selectUsername").val();
     socket.emit('cloneData', {id: dataid, user: toUsername});
+  }
+  else if (val == 13) {
+    // Query Data
+    var dataid = $("#queryId").val();
+    socket.emit('queryData', dataid);
   }
 }
 
