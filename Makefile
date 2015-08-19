@@ -1,5 +1,6 @@
 MAKE = make
-CC = g++
+CPP = g++
+CC = gcc
 .PHONY: dep
 
 BUILD_FLAG = -w -c
@@ -16,17 +17,23 @@ DEPEN_FILE = $(wildcard $(DEPEN_DIR)lib/*.o)
 INCLUDE_DIR = $(DEPEN_DIR)include/
 
 #################### OUTPUT ####################
-OUTPUT_O = main
+OUTPUT_O = app.o
 ################################################
 
 #################### SOURCE ####################
-SRC_C = main.cpp
+SRC_C = $(wildcard $(SRC_DIR)*.cpp) $(wildcard $(SRC_DIR)*.c)
+BIN_OBJ = $(notdir $(patsubst %.cpp,%.o,$(patsubst %.c,%.o,$(SRC_C))))
 ################################################
 
-bin:dep
-	$(CC) $(BUILD_FLAG) -I$(INCLUDE_DIR) -o $(BIN_DIR)main.o $(SRC_DIR)$(SRC_C)
-	$(CC) -o $(BIN_DIR)$(OUTPUT_O) $(DEPEN_FILE) $(BIN_DIR)main.o
+bin:dep $(notdir $(SRC_C))
+	$(CPP) -o $(BIN_DIR)$(OUTPUT_O) $(DEPEN_FILE) $(addprefix $(BIN_DIR),$(BIN_OBJ))
 	# g++ -w -c -g -I$(INCLUDE_DIR) main.cpp && g++ -o main main.o reqmsg.o swap_endian.o dmp.o ezxml.o && ./main
+
+%.c:
+	$(CC) $(BUILD_FLAG)  -I$(INCLUDE_DIR) $(SRC_DIR)$@ -o $(BIN_DIR)$(patsubst %.c,%.o,$@)
+
+%.cpp:
+	$(CC) $(BUILD_FLAG)  -I$(INCLUDE_DIR) $(SRC_DIR)$@ -o $(BIN_DIR)$(patsubst %.cpp,%.o,$@)
 
 dep:
 	$(MAKE) -C $(DEPEN_DIR)
