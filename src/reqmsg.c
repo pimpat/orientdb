@@ -1,7 +1,10 @@
 #include <string.h>
 #include <stdio.h>
+#include <stdint.h>
 
 #include "reqmsg.h"
+
+
 
 int addBytes(char *bytes, char len, char *buffer) {
     if (len >= 0) {
@@ -18,6 +21,8 @@ int addByte(char byte, char *buffer) {
     buffer[0] = byte;
     return sizeof(char);
 }
+#ifdef __LITTLE_ENDIAN__
+
 int addShort(short num, char *buffer) {
     buffer[0] = (num>>8) & 0xff;
     buffer[1] = (num) & 0xff;
@@ -41,6 +46,22 @@ int addLong(long num ,char *buffer) {
     buffer[7] = (num) & 0xff;
     return sizeof(long);
 }
+
+#else
+
+int addShort(short num, char *buffer) {
+	memcpy(buffer, &num, sizeof(short));
+    return sizeof(short);
+}
+int addInt(int num, char *buffer) {
+	memcpy(buffer, &num, sizeof(int));
+    return sizeof(int);
+}
+int addLong(long num ,char *buffer) {
+	memcpy(buffer, &num, sizeof(long));
+    return sizeof(long);
+}
+#endif
 int addString(char *str, char *buffer) {
     if (str != NULL) {
         int len = (int)strlen(str);
