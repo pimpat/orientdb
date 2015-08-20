@@ -33,7 +33,7 @@ bin:dep $(notdir $(SRC_C))
 	$(CC) $(BUILD_FLAG)  -I$(INCLUDE_DIR) $(SRC_DIR)$@ -o $(BIN_DIR)$(patsubst %.c,%.o,$@)
 
 %.cpp:
-	$(CC) $(BUILD_FLAG)  -I$(INCLUDE_DIR) $(SRC_DIR)$@ -o $(BIN_DIR)$(patsubst %.cpp,%.o,$@)
+	$(CC) $(DEBUG_FLAG)  -I$(INCLUDE_DIR) $(SRC_DIR)$@ -o $(BIN_DIR)$(patsubst %.cpp,%.o,$@)
 
 dep:
 	$(MAKE) -C $(DEPEN_DIR)

@@ -293,6 +293,7 @@ char** getTaskFromCatID(char* catID, DTPacket* dtPacket);
 char** getDataFromDataID(char* dataID, int dType, DTPacket* dtPacket);
 
 //char* getUpperIDFromDataID(char* userID,char* dataID);
+char* readcontent(const char *filename);
 
 std::string& replace(std::string& s, const std::string& from, const std::string& to);
 int main() {
@@ -3838,6 +3839,25 @@ void testCRUD(Data** data){
 //    }
 //    free(list);
 //-------------------------------------------------------------------------
+    
+    char* myDiff = readcontent("/Users/pimpat/Desktop/diff_content.txt");
+    printf("\ns:\n: %s\n",myDiff);
+    printf("\nlen: %d\n",strlen(myDiff));
+    
+    Data* data_str = buildDatafromString(myDiff);
+    printf("dataID: %s\n",data_str->dataID);
+    printf("dataName: %s\n",data_str->dataName);
+    ObjectBinary *obj_l = getDataContentLastestCommon(data_str);
+    if(obj_l != NULL){
+        printf("\n--- test(getLast->buildDatafromString) ---\n");
+        printf("schemaCode: %d\n",obj_l->schemaCode);
+        printf("byteCount: %d\n",obj_l->byteCount);
+        printf("data: %s\n",obj_l->data);
+        freeObjBinary(obj_l);
+    }
+    freeData(data_str);
+    free(myDiff);
+    
     disconnectServer(&dtPacket);
     close(dtPacket.Sockfd);
 }
@@ -4290,4 +4310,21 @@ char** getDataFromDataID(char* dataID, int dType, DTPacket* dtPacket){
     return list;
 }
 
-
+char* readcontent(const char *filename){
+    char *fcontent = NULL;
+    int fsize = 0;
+    FILE *fp;
+    
+    fp = fopen(filename, "r");
+    if(fp) {
+        fseek(fp, 0, SEEK_END);
+        fsize = ftell(fp);
+        rewind(fp);
+        
+        fcontent = (char*) malloc(sizeof(char) * fsize);
+        fread(fcontent, 1, fsize, fp);
+        
+        fclose(fp);
+    }
+    return fcontent;
+}
