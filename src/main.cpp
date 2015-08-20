@@ -284,6 +284,16 @@ void freeObjBinary(ObjectBinary* obj);
 char* buildStringFromData(Data* data);
 Data* buildDatafromString(char* strPack);
 
+char** getUserFromOrgID(char* orgID, DTPacket* dtPacket);
+char** getCatFromUserID(char* userID, DTPacket* dtPacket);
+char** getStateFromCatID(char* catID, DTPacket* dtPacket);
+char** getTaskFromStateID(char* stateID, DTPacket* dtPacket);
+char** getSubTaskFromTaskID(char* taskID, DTPacket* dtPacket);
+char** getTaskFromCatID(char* catID, DTPacket* dtPacket);
+char** getDataFromDataID(char* dataID, int dType, DTPacket* dtPacket);
+
+//char* getUpperIDFromDataID(char* userID,char* dataID);
+
 std::string& replace(std::string& s, const std::string& from, const std::string& to);
 int main() {
     /*
@@ -3635,6 +3645,11 @@ void testCRUD(Data** data){
     deleteObj((char*)uuid_user2, (char*)uuid_cat2, (char*)uuid_state,&dtPacket);
 */
 //-------------------------------------------------------------------------
+//    addTask2CategoryByID("2603169373904B9FBF05F72620D70F3D", "4EC579D4402740A19D1DADA9542D38E5",&dtPacket);
+//    addTask2StateByID("A1C49651099946C7B2F9CD0B70092797","4EC579D4402740A19D1DADA9542D38E5",&dtPacket);
+//    addData2DataByID("8B8462EC0C8A4519B05A9D9DB788F13F","AB7E6634A8ED4F37895982BF9F0D6196",_toCategory,&dtPacket);
+//    addTask2CategoryByID("AB7E6634A8ED4F37895982BF9F0D6196","4EC579D4402740A19D1DADA9542D38E5",&dtPacket);
+    
 
 //----[3]------------------------------------------------------------------[ts]
 //    setDataNameByID("9956F26257E54272A33902A1E4309D42","DST",&dtPacket);
@@ -3665,40 +3680,40 @@ void testCRUD(Data** data){
 //    addUser2OrgByID("12F5B1ED18BF470AB0F22A5CE571D379","8025B5A5A68F4285AF58FEEB0A32CFFA",&dtPacket);
 
 //----[6]------------------------------------------------------------------[ts]
-    Data* q_data = queryDataByID("AB461924401F4B98B3DBB183CA9FEA50",&dtPacket);
-//    Data* q_data = queryDataByID("2603169373904B9FBF05F72620D70F3D",&dtPacket);
-    printf("\n--- query Data ---\n");
-    printf("dataID: %s\n", q_data->dataID);
-    printf("dataName: %s\n", q_data->dataName);
-    printf("dataType: %d\n", q_data->dataType);
-    printf("chatRoom: %s\n", q_data->chatRoom);
-    printf("versionKeeped: %d\n", q_data->content->versionKeeped);
-    
-    if(q_data->content->head->fullContent != NULL)
-        printf("head: %s\n", q_data->content->head->fullContent->data);
-    if(q_data->content->lastestCommon->minusPatch != NULL)
-        printf("last(minus): %s\n", q_data->content->lastestCommon->minusPatch->data);
-    if(q_data->content->lastestCommon->fullContent != NULL)
-        printf("last(full): %s\n", q_data->content->lastestCommon->fullContent->data);
-    
-    int count_dc = countDataContent(q_data);
-    printf("count_dc: %d\n",count_dc-1);
-    
-    char* strPack = buildStringFromData(q_data);
-    Data* data_str = buildDatafromString(strPack);
-    ObjectBinary *obj_l = getDataContentLastestCommon(data_str);
-    if(obj_l != NULL){
-        printf("\n--- test(getLast->buildDatafromString) ---\n");
-        printf("schemaCode: %d\n",obj_l->schemaCode);
-        printf("byteCount: %d\n",obj_l->byteCount);
-        printf("data: %s\n",obj_l->data);
-        freeObjBinary(obj_l);
-    }
-    free(strPack);
-    freeData(data_str);
-    
-    /* free Data */
-    freeData(q_data);
+//    Data* q_data = queryDataByID("AB461924401F4B98B3DBB183CA9FEA50",&dtPacket);
+////    Data* q_data = queryDataByID("2603169373904B9FBF05F72620D70F3D",&dtPacket);
+//    printf("\n--- query Data ---\n");
+//    printf("dataID: %s\n", q_data->dataID);
+//    printf("dataName: %s\n", q_data->dataName);
+//    printf("dataType: %d\n", q_data->dataType);
+//    printf("chatRoom: %s\n", q_data->chatRoom);
+//    printf("versionKeeped: %d\n", q_data->content->versionKeeped);
+//    
+//    if(q_data->content->head->fullContent != NULL)
+//        printf("head: %s\n", q_data->content->head->fullContent->data);
+//    if(q_data->content->lastestCommon->minusPatch != NULL)
+//        printf("last(minus): %s\n", q_data->content->lastestCommon->minusPatch->data);
+//    if(q_data->content->lastestCommon->fullContent != NULL)
+//        printf("last(full): %s\n", q_data->content->lastestCommon->fullContent->data);
+//    
+//    int count_dc = countDataContent(q_data);
+//    printf("count_dc: %d\n",count_dc-1);
+//    
+//    char* strPack = buildStringFromData(q_data);
+//    Data* data_str = buildDatafromString(strPack);
+//    ObjectBinary *obj_l = getDataContentLastestCommon(data_str);
+//    if(obj_l != NULL){
+//        printf("\n--- test(getLast->buildDatafromString) ---\n");
+//        printf("schemaCode: %d\n",obj_l->schemaCode);
+//        printf("byteCount: %d\n",obj_l->byteCount);
+//        printf("data: %s\n",obj_l->data);
+//        freeObjBinary(obj_l);
+//    }
+//    free(strPack);
+//    freeData(data_str);
+//    
+//    /* free Data */
+//    freeData(q_data);
 //-------------------------------------------------------------------------
 
 //----[7]------------------------------------------------------------------[ts]
@@ -3812,7 +3827,17 @@ void testCRUD(Data** data){
 //-------------------------------------------------------------------------
 
 //    Org** org = queryOrgFromData("E4DEA39D5E7646918E07B414C2CC0671",&dtPacket);
-    
+
+//----[17]-----------------------------------------------------------------[ts]
+//    char** list = getCatFromUserID("8B8462EC0C8A4519B05A9D9DB788F13F",&dtPacket);
+////    char** list = getTaskFromCatID("2603169373904B9FBF05F72620D70F3D", &dtPacket);
+//    printf("\n--- test list ---\n");
+//    for(i=0;list[i]!=NULL;i++){
+//        printf("list[%d]: %s\n",i,list[i]);
+//        free(list[i]);
+//    }
+//    free(list);
+//-------------------------------------------------------------------------
     disconnectServer(&dtPacket);
     close(dtPacket.Sockfd);
 }
@@ -4130,5 +4155,139 @@ Data* buildDatafromString(char* strPack){
     return dt;
 }
 
+char** getUserFromOrgID(char* orgID, DTPacket* dtPacket){
+    char** list = getDataFromDataID(orgID, _user,dtPacket);
+    return list;
+}
+
+char** getCatFromUserID(char* userID, DTPacket* dtPacket){
+    char** list = getDataFromDataID(userID, _category,dtPacket);
+    return list;
+}
+
+char** getStateFromCatID(char* catID, DTPacket* dtPacket){
+    char** list = getDataFromDataID(catID, _state,dtPacket);
+    return list;
+}
+
+char** getTaskFromStateID(char* stateID, DTPacket* dtPacket){
+    char** list = getDataFromDataID(stateID, _task,dtPacket);
+    return list;
+    
+}
+
+char** getSubTaskFromTaskID(char* taskID, DTPacket* dtPacket){
+    char** list = getDataFromDataID(taskID, _subTask,dtPacket);
+    return list;
+}
+
+char** getTaskFromCatID(char* catID, DTPacket* dtPacket){
+    char** list = getDataFromDataID(catID, _task,dtPacket);
+    return list;
+}
+
+char** getDataFromDataID(char* dataID, int dType, DTPacket* dtPacket){
+    char sql[MAX_SQL_SIZE];
+    char *token, *result;
+    switch(dType){
+        case _user:
+            printf("--------------------------------------------------[get dataID,dataName_user]\n");
+            sprintf(sql,"select dataID,dataName from (select expand(out('toUser')) from data where dataID='%s')",dataID);
+            printf("SQL: %s\n",sql);
+            result = getContent(sql,dtPacket);
+            if(result==NULL){
+                printf("not found any user\n");
+                return NULL;
+            }
+            break;
+        case _category:
+            printf("--------------------------------------------------[get dataID,dataName_category]\n");
+            sprintf(sql,"select dataID,dataName from (select expand(out('toCategory')) from data where dataID='%s')",dataID);
+            printf("SQL: %s\n",sql);
+            result = getContent(sql,dtPacket);
+            if(result==NULL){
+                printf("not found any category\n");
+                return NULL;
+            }
+            break;
+        case _state:
+            printf("--------------------------------------------------[get dataID,dataName_state]\n");
+            sprintf(sql,"select dataID,dataName from (select expand(out('toState')) from data where dataID='%s')",dataID);
+            printf("SQL: %s\n",sql);
+            result = getContent(sql,dtPacket);
+            if(result==NULL){
+                printf("not found any state\n");
+                return NULL;
+            }
+            break;
+        case _task:
+            printf("--------------------------------------------------[get dataID,dataName_task]\n");
+            sprintf(sql,"select dataID,dataName from (select expand(out('toTask')) from data where dataID='%s')",dataID);
+            printf("SQL: %s\n",sql);
+            result = getContent(sql,dtPacket);
+            if(result==NULL){
+                printf("not found any task\n");
+                return NULL;
+            }
+            break;
+        case _subTask:
+            printf("--------------------------------------------------[get dataID,dataName_subTask]\n");
+            sprintf(sql,"select dataID,dataName from (select expand(out('toSubTask')) from data where dataID='%s')",dataID);
+            printf("SQL: %s\n",sql);
+            result = getContent(sql,dtPacket);
+            if(result==NULL){
+                printf("not found any subTask\n");
+                return NULL;
+            }
+            break;
+        default:
+            return NULL;
+            break;
+    }
+    
+    printf("result: %s\n",result);
+    char* res=strdup(result);
+    int count=0;
+    token=strtok(result,"#");
+    while(token!=NULL){
+        count++;
+        token=strtok(NULL, "#");
+    }
+    free(result);
+    
+    char** list = (char**)malloc(sizeof(char*)*(count+1));
+    list[count] = NULL;
+    printf("count: %d\n",count);
+    int i,len_str;
+    char *tmp_id, *tmp_name;
+    token = strtok(res,"\"");
+    for(i=0;i<count;i++){
+//        printf("\n\ntoken: %s\n",token);
+        token=strtok(NULL, "\"");
+        printf("dataID: %s\n",token);
+        len_str = strlen(token);
+        tmp_id = strdup(token);
+        
+        token=strtok(NULL, "\"");
+        token=strtok(NULL, "\"");
+        printf("dataName: %s\n",token);
+        len_str = len_str + strlen(token);
+        tmp_name = strdup(token);
+
+        token=strtok(NULL, "\"");
+        
+        list[i] = (char*) malloc(sizeof(char)*(len_str+2));
+        sprintf(list[i],"%s:%s",tmp_id,tmp_name);
+//        printf("len(m): %d\n",len_str+2);
+//        printf("len: %d\n",strlen(list[i]));
+        printf("list[%d]: %s\n",i,list[i]);
+        len_str=0;
+        free(tmp_id);
+        free(tmp_name);
+    }
+    free(res);
+    
+    return list;
+}
 
 
