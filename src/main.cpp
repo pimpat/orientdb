@@ -5,8 +5,11 @@
 
 #include <time.h>
 
-//#include "zmq.h"
+//#include <zmq.h>
+//#include <assert.h>
 //#include "zhelpers.h"
+//#include "transport.h"
+//#include <jansson.h>
 
 #include <string>
 #include <iostream>
@@ -15,7 +18,6 @@
 #include <fstream>
 
 #include <uuid/uuid.h>
-//#include <jansson.h>
 #include "reqmsg.h"
 #include "swap_endian.h"
 #include "diff_match_patch.h"
@@ -284,6 +286,7 @@ void freeObjBinary(ObjectBinary* obj);
 char* buildStringFromData(Data* data);
 Data* buildDatafromString(char* strPack);
 
+char** getOrgID(DTPacket* dtPacket);
 char** getUserFromOrgID(char* orgID, DTPacket* dtPacket);
 char** getCatFromUserID(char* userID, DTPacket* dtPacket);
 char** getStateFromCatID(char* catID, DTPacket* dtPacket);
@@ -3830,7 +3833,8 @@ void testCRUD(Data** data){
 //    Org** org = queryOrgFromData("E4DEA39D5E7646918E07B414C2CC0671",&dtPacket);
 
 //----[17]-----------------------------------------------------------------[ts]
-//    char** list = getCatFromUserID("8B8462EC0C8A4519B05A9D9DB788F13F",&dtPacket);
+//    char** list = getOrgID(&dtPacket);
+////    char** list = getCatFromUserID("8B8462EC0C8A4519B05A9D9DB788F13F",&dtPacket);
 ////    char** list = getTaskFromCatID("2603169373904B9FBF05F72620D70F3D", &dtPacket);
 //    printf("\n--- test list ---\n");
 //    for(i=0;list[i]!=NULL;i++){
@@ -3840,24 +3844,25 @@ void testCRUD(Data** data){
 //    free(list);
 //-------------------------------------------------------------------------
     
-    char* myDiff = readcontent("/Users/pimpat/Desktop/diff_content.txt");
-    printf("\ns:\n: %s\n",myDiff);
-    printf("\nlen: %d\n",strlen(myDiff));
-    
-    Data* data_str = buildDatafromString(myDiff);
-    printf("dataID: %s\n",data_str->dataID);
-    printf("dataName: %s\n",data_str->dataName);
-    ObjectBinary *obj_l = getDataContentLastestCommon(data_str);
-    if(obj_l != NULL){
-        printf("\n--- test(getLast->buildDatafromString) ---\n");
-        printf("schemaCode: %d\n",obj_l->schemaCode);
-        printf("byteCount: %d\n",obj_l->byteCount);
-        printf("data: %s\n",obj_l->data);
-        freeObjBinary(obj_l);
-    }
-    freeData(data_str);
-    free(myDiff);
-    
+//---- test(getLast->buildDatafromString) ---------------------------------
+//    char* myDiff = readcontent("/Users/pimpat/Desktop/diff_content.txt");
+//    printf("\ns:\n: %s\n",myDiff);
+//    printf("\nlen: %d\n",strlen(myDiff));
+//    
+//    Data* data_str = buildDatafromString(myDiff);
+//    printf("dataID: %s\n",data_str->dataID);
+//    printf("dataName: %s\n",data_str->dataName);
+//    ObjectBinary *obj_l = getDataContentLastestCommon(data_str);
+//    if(obj_l != NULL){
+//        printf("\n--- test(getLast->buildDatafromString) ---\n");
+//        printf("schemaCode: %d\n",obj_l->schemaCode);
+//        printf("byteCount: %d\n",obj_l->byteCount);
+//        printf("data: %s\n",obj_l->data);
+//        freeObjBinary(obj_l);
+//    }
+//    freeData(data_str);
+//    free(myDiff);
+//-------------------------------------------------------------------------
     disconnectServer(&dtPacket);
     close(dtPacket.Sockfd);
 }
@@ -4175,6 +4180,11 @@ Data* buildDatafromString(char* strPack){
     return dt;
 }
 
+char** getOrgID(DTPacket* dtPacket){
+    char** list = getDataFromDataID(NULL, _org,dtPacket);
+    return list;
+}
+
 char** getUserFromOrgID(char* orgID, DTPacket* dtPacket){
     char** list = getDataFromDataID(orgID, _user,dtPacket);
     return list;
@@ -4210,6 +4220,16 @@ char** getDataFromDataID(char* dataID, int dType, DTPacket* dtPacket){
     char sql[MAX_SQL_SIZE];
     char *token, *result;
     switch(dType){
+        case _org:
+            printf("--------------------------------------------------[get dataID,dataName_user]\n");
+            sprintf(sql,"select dataID,dataName from data where dataType=%d)",_org);
+            printf("SQL: %s\n",sql);
+            result = getContent(sql,dtPacket);
+            if(result==NULL){
+                printf("not found any org\n");
+                return NULL;
+            }
+            break;
         case _user:
             printf("--------------------------------------------------[get dataID,dataName_user]\n");
             sprintf(sql,"select dataID,dataName from (select expand(out('toUser')) from data where dataID='%s')",dataID);
