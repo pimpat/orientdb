@@ -27,6 +27,9 @@ char* getContent(char *query, DTPacket* dtPacket);
 char** getArrayRid(char* query, DTPacket* dtPacket);
 char** getArrayDistinctRid(char* query, DTPacket* dtPacket);
 
+void varintParse(int64_t in, uint8_t *buffer);
+int64_t varintUnparse(uint8_t *buffer);
+void printAsciiVarint(uint8_t *buffer);
 #ifdef __cplusplus
 }
 #endif
