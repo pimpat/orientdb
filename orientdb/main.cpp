@@ -118,13 +118,12 @@ extern Data* mydata;
 Data* mydata = NULL;
 
 enum DATATYPE {
-    _data,
-    _subTask,
-    _task,
-    _state,
-    _category,
-    _user,
-    _org
+    _org,       //  0
+    _user,      //  1
+    _category,  //  2
+    _state,     //  3
+    _task,      //  4
+    _subTask    //  5
 };
 
 enum EDGETYPE {
@@ -277,6 +276,17 @@ void test_getData(Data** data);
 void testCRUD(Data** data);
 void freeData(Data* data);
 void freeObjBinary(ObjectBinary* obj);
+char* buildStringFromData(Data* data);
+Data* buildDatafromString(char* strPack);
+
+char** getOrgID(DTPacket* dtPacket);
+char** getUserFromOrgID(char* orgID, DTPacket* dtPacket);
+char** getCatFromUserID(char* userID, DTPacket* dtPacket);
+char** getStateFromCatID(char* catID, DTPacket* dtPacket);
+char** getTaskFromStateID(char* stateID, DTPacket* dtPacket);
+char** getSubTaskFromTaskID(char* taskID, DTPacket* dtPacket);
+char** getTaskFromCatID(char* catID, DTPacket* dtPacket);
+char** getDataFromDataID(char* dataID, int dType, DTPacket* dtPacket);
 
 char* genString(Data* data);
 char* genMsg(Data* data);
@@ -295,6 +305,8 @@ int main() {
     printf("replace: %s\n",result.c_str());
     */
 
+
+
     int ret;
     DTPacket dtPacket;
     dtPacket.Sockfd = connectSocket(&dtPacket);
@@ -310,14 +322,14 @@ int main() {
     swapEndian(&ssid, INT);
     printf("sessionid: %d\n\n",ssid);
 
-    //test_setNewData();
+    // test_setNewData();
 
-    char * org_uuid = (char *)malloc(100*sizeof(char));
-    char * user_uuid = (char *)malloc(100*sizeof(char));
-    char * category_uuid = (char *)malloc(100*sizeof(char));
-    char * state_uuid = (char *)malloc(100*sizeof(char));
-    char * task_uuid = (char *)malloc(100*sizeof(char));
-    char * subtask_uuid = (char *)malloc(100*sizeof(char));
+    // char * org_uuid = (char *)malloc(100*sizeof(char));
+    // char * user_uuid = (char *)malloc(100*sizeof(char));
+    // char * category_uuid = (char *)malloc(100*sizeof(char));
+    // char * state_uuid = (char *)malloc(100*sizeof(char));
+    // char * task_uuid = (char *)malloc(100*sizeof(char));
+    // char * subtask_uuid = (char *)malloc(100*sizeof(char));
 
     void *context = zmq_ctx_new ();
     void *responder = zmq_socket (context, ZMQ_REP);
@@ -341,98 +353,92 @@ int main() {
             int casetype = atoi(token);
             token = strtok(NULL,":");
             char *Name = strdup(token);
-            printf("%s\n", Name);
+            token = strtok(NULL,":");
+            char *upperId = strdup(token);
 
-            // if (casetype == 1){
-            //     const char *dID = createOrg(Name, newSchema, &dtPacket);
-            //     strcat(new_uuid, dID);
-            //     strcpy(org_uuid, dID);
-            //     strcat(msg, "Org");
-            //     printf("---%s\n", org_uuid);
-            // }
-            // else if (casetype == 2){
-            //     const char *dID = createUser(Name, newSchema, &dtPacket);
-            //     strcat(new_uuid, dID);
-            //     strcpy(user_uuid, dID);
-            //     strcat(msg, "User");
-            //     printf("---%s\n", org_uuid);
-            //     printf("---%s\n", user_uuid);
-            //     addUser2OrgByID(org_uuid, user_uuid, &dtPacket);
-            // }
-            // else if (casetype == 3){
-            //     const char *dID = createCategory(Name, newSchema, &dtPacket);
-            //     strcat(new_uuid, dID);
-            //     strcpy(category_uuid, dID);
-            //     strcat(msg, "Category");
-            //     printf("---%s\n", user_uuid);
-            //     printf("---%s\n", category_uuid);
-            //     addCategory2UserByID(user_uuid, category_uuid, &dtPacket);
-            // }
-            // else if (casetype == 4){
-            //     const char *dID = createState(Name, newSchema, &dtPacket);
-            //     strcat(new_uuid, dID);
-            //     strcpy(state_uuid, dID);
-            //     strcat(msg, "State");
-            //     printf("---%s\n", category_uuid);
-            //     printf("---%s\n", state_uuid);
-            //     addState2CategoryByID(category_uuid, state_uuid, &dtPacket);
-            // }
-            // else if (casetype == 5){
-            //     const char *dID = createTask(Name, newSchema, &dtPacket);
-            //     strcat(new_uuid, dID);
-            //     strcpy(task_uuid, dID);
-            //     strcat(msg, "Task");
-            //     printf("---%s\n", state_uuid);
-            //     printf("---%s\n", task_uuid);
-            //     addTask2StateByID(state_uuid, task_uuid, &dtPacket);
-            // }
-            // else if (casetype == 6){
-            //     const char *dID = createSubTask(Name, newSchema, &dtPacket);
-            //     strcat(new_uuid, dID);
-            //     strcpy(subtask_uuid, dID);
-            //     strcat(msg, "Subtask");
-            //     printf("---%s\n", task_uuid);
-            //     printf("---%s\n", subtask_uuid);
-            //     addSubTask2TaskByID(task_uuid, subtask_uuid, &dtPacket);
-            // }
-            // else if (casetype == 7){
-            //     const char *dID = createTask(Name, newSchema, &dtPacket);
-            //     strcat(new_uuid, dID);
-            //     strcpy(task_uuid, dID);
-            //     strcat(msg, "Task");
-            //     printf("---%s\n", category_uuid);
-            //     printf("---%s\n", task_uuid);
-            //     addTask2CategoryByID(category_uuid, task_uuid, &dtPacket);
-            // }
-            
             if (casetype == 1){
-                strcat(new_uuid, "A49A6E33D8884D8CB4BA9AE217F077E9");
+                const char *dID = createOrg(Name, newSchema, &dtPacket);
+                strcat(new_uuid, dID);
                 strcat(msg, "Org");
+                printf("---%s\n", upperId);
             }
             else if (casetype == 2){
-                strcat(new_uuid, "613CC870FA9A4ECABE5E42E3EE66DF15");
+                const char *dID = createUser(Name, newSchema, &dtPacket);
+                strcat(new_uuid, dID);
                 strcat(msg, "User");
+                printf("---%s\n", upperId);
+                printf("---%s\n", new_uuid);
+                addUser2OrgByID(upperId, new_uuid, &dtPacket);
             }
             else if (casetype == 3){
-                strcat(new_uuid, "A57CA09C802745289C9959EA43D1CF2F");
+                const char *dID = createCategory(Name, newSchema, &dtPacket);
+                strcat(new_uuid, dID);
                 strcat(msg, "Category");
+                printf("---%s\n", upperId);
+                printf("---%s\n", new_uuid);
+                addCategory2UserByID(upperId, new_uuid, &dtPacket);
             }
             else if (casetype == 4){
-                strcat(new_uuid, "E8E045F1C7BF4F3280E3912AE29FA9B8");
+                const char *dID = createState(Name, newSchema, &dtPacket);
+                strcat(new_uuid, dID);
                 strcat(msg, "State");
+                printf("---%s\n", upperId);
+                printf("---%s\n", new_uuid);
+                addState2CategoryByID(upperId, new_uuid, &dtPacket);
             }
             else if (casetype == 5){
-                strcat(new_uuid, "236A19345EFB4A16936A9562BAA21D7D");
+                const char *dID = createTask(Name, newSchema, &dtPacket);
+                strcat(new_uuid, dID);
                 strcat(msg, "Task");
+                printf("---%s\n", upperId);
+                printf("---%s\n", new_uuid);
+                addTask2StateByID(upperId, new_uuid, &dtPacket);
             }
             else if (casetype == 6){
-                strcat(new_uuid, "ADE6EA3EDC1D4119A9B66AE3B7705F0A");
+                const char *dID = createSubTask(Name, newSchema, &dtPacket);
+                strcat(new_uuid, dID);
                 strcat(msg, "Subtask");
+                printf("---%s\n", upperId);
+                printf("---%s\n", new_uuid);
+                addSubTask2TaskByID(upperId, new_uuid, &dtPacket);
             }
             else if (casetype == 7){
-                strcat(new_uuid, "A2C75A6CFCAD4B9986CEFEE70B97330C");
+                const char *dID = createTask(Name, newSchema, &dtPacket);
+                strcat(new_uuid, dID);
                 strcat(msg, "Task");
+                printf("---%s\n", upperId);
+                printf("---%s\n", new_uuid);
+                addTask2CategoryByID(upperId, new_uuid, &dtPacket);
             }
+            
+            // if (casetype == 1){
+            //     strcat(new_uuid, "AA8A8F10F4894D0A81254AB9E4C71DAA");
+            //     strcat(msg, "Org");
+            // }
+            // else if (casetype == 2){
+            //     strcat(new_uuid, "F2DC33299B00418A8D15F86FC0C6D5C0");
+            //     strcat(msg, "User");
+            // }
+            // else if (casetype == 3){
+            //     strcat(new_uuid, "D8B7B4BBBEF943BFAFD42584BDCBD351");
+            //     strcat(msg, "Category");
+            // }
+            // else if (casetype == 4){
+            //     strcat(new_uuid, "34D5207389D248D085297668A3D1D07B");
+            //     strcat(msg, "State");
+            // }
+            // else if (casetype == 5){
+            //     strcat(new_uuid, "CFEB0ABBBABE44C3A0DE11D9E0E44CDF");
+            //     strcat(msg, "Task");
+            // }
+            // else if (casetype == 6){
+            //     strcat(new_uuid, "4BD106FA7B9546AEAD8B40A9456F9E07");
+            //     strcat(msg, "Subtask");
+            // }
+            // else if (casetype == 7){
+            //     strcat(new_uuid, "A64BC8E7D4304996B18B670F51B875CB");
+            //     strcat(msg, "Task");
+            // }
             
             Data* dData = queryDataByID(new_uuid, &dtPacket);
             printf("--->%s\n", dData->dataID);
@@ -486,15 +492,31 @@ int main() {
             char* msg = genMsg(dData);
             
             char rep_str[10000];
-            sprintf(rep_str, "1:%s:%s", msg, strDT);
+            sprintf(rep_str, "5:%s:%s", msg, strDT);
             printf("%s\n", rep_str);
             s_send(responder, rep_str);
 
         }
         else if(numtype == 3){
-            // Deleate Data
-            // deleteObj(userID, upperID, objID, &dtPacket);
-            s_send(responder, "test");
+            // Delete Data
+            token = strtok(NULL,":");
+            char *objID = strdup(token);
+            token = strtok(NULL,":");
+            char *upperID = strdup(token);
+            token = strtok(NULL,":");
+            char *userUpperID = strdup(token);
+
+            ReturnErr chk = deleteObj(userUpperID, upperID, objID, &dtPacket);
+            if (chk == 0)
+            {
+                char rep_str[10000];
+                sprintf(rep_str, "6:%s:%s", "Delete success", objID);
+                printf("%s\n", rep_str);
+                s_send(responder, rep_str);
+            }
+            else{
+                s_send(responder, "404:Delete failed");
+            }
         }
         else if(numtype == 4){
             //char uuid[100] = "ADE6EA3EDC1D4119A9B66AE3B7705F0A";
@@ -519,14 +541,20 @@ int main() {
             // }
 
             Data *data = queryDataByID(id, &dtPacket);
-            char* strDT = genString(data);
-            char* msg = genMsg(data);
-            printf("-=-=-=-=-=- %s\n", msg);
-            char rep_str[10000];
-            sprintf(rep_str, "1:%s:%s", msg, strDT);
-            printf(">>>>> Finished Query <<<<<\n");
-            printf("%s\n", rep_str);
-            s_send(responder, rep_str);
+            printf("Query Result : %s\n", data);
+            if (data != NULL){
+                char* strDT = genString(data);
+                char* msg = genMsg(data);
+                char rep_str[10000];
+                sprintf(rep_str, "1:%s:%s", msg, strDT);
+                printf(">>>>> Finished Query <<<<<\n");
+                printf("%s\n", rep_str);
+                s_send(responder, rep_str);
+            }
+            else{
+                s_send(responder, "404:not found data");
+            }
+            
         }
         else if(numtype == 5){
             // Clone Data
@@ -546,13 +574,233 @@ int main() {
             printf("Name : %s\n", name);
             s_send(responder, "2:Login Success!");
         }
+        else if(numtype == 7){
+            // get Datalists
+            char strlists[10000] = ""; 
+            char msg[20] = "";
+            token = strtok(NULL,":");
+            int casetype = atoi(token);
+            token = strtok(NULL,":");
+            char *Did = strdup(token);
+
+            if (casetype == 1){
+                strcat(msg, "User");
+                char** list = getUserFromOrgID(Did, &dtPacket);
+                if (list != NULL)
+                {
+                    printf("\n--- test list ---\n");
+                    for(int i=0;list[i]!=NULL;i++){
+                        printf("list[%d]: %s\n",i,list[i]);
+                        strcat(strlists, list[i]);
+                        strcat(strlists, ":");
+                        free(list[i]);
+                    }
+                    free(list);
+
+                    char rep_str[10000];
+                    sprintf(rep_str, "4:%s:%s", msg, strlists);
+                    printf("%s\n", rep_str);
+                    s_send(responder, rep_str);
+                }
+                else{
+                    s_send(responder, "404:Userlists are NULL");
+                }
+
+            }
+            else if (casetype == 2){
+                strcat(msg, "Category");
+                char** list = getCatFromUserID(Did, &dtPacket);
+                if (list != NULL)
+                {
+                    printf("\n--- test list ---\n");
+                    for(int i=0;list[i]!=NULL;i++){
+                        printf("list[%d]: %s\n",i,list[i]);
+                        strcat(strlists, list[i]);
+                        strcat(strlists, ":");
+                        free(list[i]);
+                    }
+                    free(list);
+
+                    char rep_str[10000];
+                    sprintf(rep_str, "4:%s:%s", msg, strlists);
+                    printf("%s\n", rep_str);
+                    s_send(responder, rep_str);
+                }
+                else{
+                    s_send(responder, "404:Categorylists are NULL");
+                }
+            }
+            else if (casetype == 3){
+                strcat(msg, "State");
+                char** list = getStateFromCatID(Did, &dtPacket);
+                if (list != NULL)
+                {
+                    printf("\n--- test list ---\n");
+                    for(int i=0;list[i]!=NULL;i++){
+                        printf("list[%d]: %s\n",i,list[i]);
+                        strcat(strlists, list[i]);
+                        strcat(strlists, ":");
+                        free(list[i]);
+                    }
+                    free(list);
+
+                    char rep_str[10000];
+                    sprintf(rep_str, "4:%s:%s", msg, strlists);
+                    printf("%s\n", rep_str);
+                    s_send(responder, rep_str);
+                }
+                else{
+                    s_send(responder, "404:Statelists are NULL");
+                }
+            }
+            else if (casetype == 4){
+                strcat(msg, "Task");
+                char** list = getTaskFromStateID(Did, &dtPacket);
+                if (list != NULL)
+                {
+                    printf("\n--- test list ---\n");
+                    for(int i=0;list[i]!=NULL;i++){
+                        printf("list[%d]: %s\n",i,list[i]);
+                        strcat(strlists, list[i]);
+                        strcat(strlists, ":");
+                        free(list[i]);
+                    }
+                    free(list);
+
+                    char rep_str[10000];
+                    sprintf(rep_str, "4:%s:%s", msg, strlists);
+                    printf("%s\n", rep_str);
+                    s_send(responder, rep_str);
+                }
+                else{
+                    s_send(responder, "404:Tasklists are NULL");
+                }
+            }
+            else if (casetype == 5){
+                strcat(msg, "Subtask");
+                char** list = getSubTaskFromTaskID(Did, &dtPacket);
+                if (list != NULL)
+                {
+                    printf("\n--- test list ---\n");
+                    for(int i=0;list[i]!=NULL;i++){
+                        printf("list[%d]: %s\n",i,list[i]);
+                        strcat(strlists, list[i]);
+                        strcat(strlists, ":");
+                        free(list[i]);
+                    }
+                    free(list);
+
+                    char rep_str[10000];
+                    sprintf(rep_str, "4:%s:%s", msg, strlists);
+                    printf("%s\n", rep_str);
+                    s_send(responder, rep_str);
+                }
+                else{
+                    s_send(responder, "404:Subtasklists are NULL");
+                }
+            }
+            else if (casetype == 6){
+                strcat(msg, "TaskfromCat");
+                char** list = getTaskFromCatID(Did, &dtPacket);
+                if (list != NULL)
+                {
+                    printf("\n--- test list ---\n");
+                    for(int i=0;list[i]!=NULL;i++){
+                        printf("list[%d]: %s\n",i,list[i]);
+                        strcat(strlists, list[i]);
+                        strcat(strlists, ":");
+                        free(list[i]);
+                    }
+                    free(list);
+
+                    printf("%s\n", msg);
+                    printf("%s\n", strlists);
+                    char rep_str[10000];
+                    sprintf(rep_str, "4:%s:%s", msg, strlists);
+                    printf("%s\n", rep_str);
+                    s_send(responder, rep_str);
+                }
+                else{
+                    s_send(responder, "404:TaskfromCat are NULL");
+                }
+            }
+            else if (casetype == 7){
+                strcat(msg, "SubtaskfromCat");
+                char** list = getSubTaskFromTaskID(Did, &dtPacket);
+                if (list != NULL)
+                {
+                    printf("\n--- test list ---\n");
+                    for(int i=0;list[i]!=NULL;i++){
+                        printf("list[%d]: %s\n",i,list[i]);
+                        strcat(strlists, list[i]);
+                        strcat(strlists, ":");
+                        free(list[i]);
+                    }
+                    free(list);
+
+                    char rep_str[10000];
+                    sprintf(rep_str, "4:%s:%s", msg, strlists);
+                    printf("%s\n", rep_str);
+                    s_send(responder, rep_str);
+                }
+                else{
+                    s_send(responder, "404:SubtaskfromCat are NULL");
+                }
+            }
+            else if (casetype == 8){
+                strcat(msg, "Org");
+                char** list = getOrgID(&dtPacket);
+                if (list != NULL)
+                {
+                    printf("\n--- test list ---\n");
+                    for(int i=0;list[i]!=NULL;i++){
+                        printf("list[%d]: %s\n",i,list[i]);
+                        strcat(strlists, list[i]);
+                        strcat(strlists, ":");
+                        free(list[i]);
+                    }
+                    free(list);
+
+                    char rep_str[10000];
+                    sprintf(rep_str, "4:%s:%s", msg, strlists);
+                    printf("%s\n", rep_str);
+                    s_send(responder, rep_str);
+                }
+                else{
+                   s_send(responder, "404:Orglists are NULL");
+               }
+           }
+       }
+       else if(numtype == 8){
+        // Query DatafromDatalists
+
+        token = strtok(NULL,":");
+        char *id = strdup(token);
+        printf("----->>>%s\n", id);
+        Data *Qdata = queryDataByID(id, &dtPacket);
+        if (Qdata != NULL){
+            char* strDT = genString(Qdata);
+            printf("----->>>111");
+            char* msg = genMsg(Qdata);
+            printf("----->>>222");
+            char rep_str[100000];
+            sprintf(rep_str, "5:%s:%s", msg, strDT);
+            printf(">>>>> Finished Query <<<<<\n");
+            printf("%s\n", rep_str);
+            s_send(responder, rep_str);
+        }
+        else{
+            s_send(responder, "404:not found data");
+        }
+    }
+
 
         //free(str);
         //free(token);
-        
-    }
-    test_setNewData();
-    return 0;
+
+}
+test_setNewData();
+return 0;
 }
 
 std::string& replace(std::string& s, const std::string& from, const std::string& to)
@@ -4770,7 +5018,15 @@ void testCRUD(Data** data){
 //----[16]-----------------------------------------------------------------[ts]
     int y = removeTaskFromState("9ABA072021954B6C8124CA23D3F4529E","50CFEBD64BFA49A1976B5E7A46691A7A",&dtPacket);
 //-------------------------------------------------------------------------
-    
+    // printf("\n--- test list222 ---\n");
+    // char** list = getTaskFromCatID("D8B7B4BBBEF943BFAFD42584BDCBD351", &dtPacket);
+    // printf("\n--- test list ---\n");
+    // for(int i=0;list[i]!=NULL;i++){
+    //     printf("list[%d]: %s\n",i,list[i]);
+    //     free(list[i]);
+    // }
+    // free(list);
+
     disconnectServer(&dtPacket);
     close(dtPacket.Sockfd);
 }
@@ -4778,7 +5034,7 @@ void testCRUD(Data** data){
 char* genString(Data* data){
     DataContent* cont = data->content->lastestCommon;
 
-    char allVer_str[10000] = "";
+    char allVer_str[100000] = "";
     char diff[500];
     char ts[500];
     char schema[500];
@@ -4880,12 +5136,12 @@ char* genString(Data* data){
 }
 
 char* genMsg(Data* data){
-    if (data->dataType == 6){return "Org";}
-    else if (data->dataType == 5){return "User";}
-    else if (data->dataType == 4){return "Category";}
+    if (data->dataType == 0){return "Org";}
+    else if (data->dataType == 1){return "User";}
+    else if (data->dataType == 2){return "Category";}
     else if (data->dataType == 3){return "State";}
-    else if (data->dataType == 2){return "Task";}
-    else if (data->dataType == 1){return "Subtask";}
+    else if (data->dataType == 4){return "Task";}
+    else if (data->dataType == 5){return "Subtask";}
 }
 
 
@@ -4932,3 +5188,422 @@ void freeObjBinary(ObjectBinary* obj){
     free(obj);
 }
 
+char* buildStringFromData(Data* data){
+    printf("--- buildStringFromData ---\n");
+    
+    char* strPack = (char*)malloc(sizeof(char)*20000);
+    char temp[10];
+    
+    //  dataID
+    strcat(strPack,data->dataID);
+    strcat(strPack,":");
+    
+    //  dataName
+    strcat(strPack,data->dataName);
+    strcat(strPack,":");
+    
+    //  dataType
+    sprintf(temp,"%d:",data->dataType);
+    strcat(strPack,temp);
+    
+    //  chatRoom
+    if(data->chatRoom!=NULL){
+        strcat(strPack, data->chatRoom);
+    }
+    else{
+        strcat(strPack,"NULL");
+    }
+    strcat(strPack,":");
+    
+    //  versionKeeped
+    sprintf(temp,"%d:",data->content->versionKeeped);
+    strcat(strPack,temp);
+    
+    //  num content
+    int count = countDataContent(data);
+    count--;
+    printf("count: %d\n",count);
+    sprintf(temp,"%d:",count);
+    strcat(strPack,temp);
+    
+    int i=1;
+    DataContent *mydc, *next_mydc;
+    for(mydc=data->content->lastestCommon;mydc!=NULL;mydc=next_mydc){
+        next_mydc = mydc->nextVersion;
+        
+        //  ver content
+        sprintf(temp,"%d:",i);
+        strcat(strPack,temp);
+        
+        //  isDiff
+        if(mydc->isDiff == TRUE){
+            strcat(strPack,"T:");
+        }
+        else{
+            strcat(strPack,"F:");
+        }
+        
+        //  SHA256hashCode
+        if(mydc->SHA256hashCode != NULL){
+//            printf("hash: %s\n",mydc->SHA256hashCode);
+            strcat(strPack,mydc->SHA256hashCode);
+            strcat(strPack,":");
+        }
+        else{
+            strcat(strPack,"NULL:");
+        }
+        
+        //  timeStamp
+        strcat(strPack,"NULL:");
+        
+        //  minus
+        if(mydc->minusPatch != NULL){
+            sprintf(temp,"%d:",mydc->minusPatch->byteCount);
+            strcat(strPack,temp);
+            
+            sprintf(temp,"%d:",mydc->minusPatch->schemaCode);
+            strcat(strPack,temp);
+            
+//            printf("data: %s\n",mydc->minusPatch->data);
+            strcat(strPack,mydc->minusPatch->data);
+            strcat(strPack,":");
+        }
+        else{
+            strcat(strPack,"NULL:");
+        }
+        
+        //  plus
+        if(mydc->plusPatch != NULL){
+            sprintf(temp,"%d:",mydc->plusPatch->byteCount);
+            strcat(strPack,temp);
+            
+            sprintf(temp,"%d:",mydc->plusPatch->schemaCode);
+            strcat(strPack,temp);
+            
+            strcat(strPack,mydc->plusPatch->data);
+            strcat(strPack,":");
+        }
+        else{
+            strcat(strPack,"NULL:");
+        }
+        
+        //  full
+        if(mydc->fullContent != NULL){
+            sprintf(temp,"%d:",mydc->fullContent->byteCount);
+            strcat(strPack,temp);
+            
+            sprintf(temp,"%d:",mydc->fullContent->schemaCode);
+            strcat(strPack,temp);
+            
+            strcat(strPack,mydc->fullContent->data);
+            strcat(strPack,":");
+        }
+        else{
+            strcat(strPack,"NULL:");
+        }
+        
+        i++;
+    }
+    strPack[strlen(strPack)-1] ='\0';
+    printf("len: %d\n",strlen(strPack));
+    printf("\n\n%s\n\n\n",strPack);
+    
+    return strPack;
+}
+
+Data* buildDatafromString(char* strPack){
+    printf("--- buildDatafromString ---\n");
+    
+    char* token;
+    Data* dt = (Data*)malloc(sizeof(Data));
+    
+    //  dataID
+    token = strtok(strPack,":");
+    printf("dataID: %s\n",token);
+    dt->dataID = strdup(token);
+    
+    //  dataName
+    token = strtok(NULL,":");
+    printf("dataName: %s\n",token);
+    dt->dataName = strdup(token);
+    
+    //  dataType
+    token = strtok(NULL,":");
+    printf("dataType: %s\n",token);
+    dt->dataType = atoi(token);
+    
+    //  chatRoom
+    token = strtok(NULL,":");
+    printf("chatRoom: %s\n",token);
+    dt->chatRoom = strdup(token);
+    
+    DataHolder* dh = (DataHolder*)malloc(sizeof(DataHolder));
+    dt->content = dh;
+    
+    //  versionKeeped
+    token = strtok(NULL,":");
+    printf("versionKeeped: %s\n",token);
+    dh->versionKeeped = atoi(token);
+    
+    dh->head = NULL;
+    dh->lastestCommon = NULL;
+    dh->current = NULL;
+    
+    //  num content
+    token = strtok(NULL,":");
+    int count = atoi(token);
+    printf("count: %d\n",count);
+    
+    DataContent** dc = (DataContent**)malloc(sizeof(DataContent*)*(count+1));
+    int i;
+    for(i=0;i<count;i++){
+        dc[i] = (DataContent*)malloc(sizeof(DataContent));
+    }
+    
+    dh->head = dc[count-1];
+    dh->lastestCommon = dc[0];
+    dh->current = dc[count-1];
+    dc[count] = NULL;
+    
+    for(i=0;i<count;i++){
+        printf("--- DataContent[%d] ---\n",i);
+        token = strtok(NULL, ":");
+        printf("ver: %s\n",token);
+        
+        dc[i]->dataHd = dh;
+        if(i!=0){
+            dc[i]->preVersion = dc[i-1];
+        }
+        if(i!=count-1){
+            dc[i]->nextVersion = dc[i+1];
+        }
+        
+        //  isDiff
+        token = strtok(NULL, ":");
+        if(strcmp(token,"T")==0){
+            dc[i]->isDiff = TRUE;
+        }
+        else{
+            dc[i]->isDiff = FALSE;
+        }
+        
+        //  SHA256hashCode
+        token = strtok(NULL, ":");
+        printf("SHA256hashCode: %s\n",token);
+        dc[i]->SHA256hashCode = strdup(token);
+        
+        //  timeStamp
+        token = strtok(NULL, ":");
+        printf("timeStamp: %s\n",token);
+        dc[i]->timeStamp = NULL;
+        
+        token = strtok(NULL, ":");
+        if(strcmp(token,"NULL")!=0){
+            dc[i]->minusPatch = (ObjectBinary*)malloc(sizeof(ObjectBinary));
+            printf("byteCount: %s\n",token);
+            dc[i]->minusPatch->byteCount = atoi(token);
+            
+            token = strtok(NULL, ":");
+            printf("schemaCode: %s\n",token);
+            dc[i]->minusPatch->schemaCode = atoi(token);
+            
+            token = strtok(NULL, ":");
+            printf("minus: %s\n",token);
+            dc[i]->minusPatch->data = strdup(token);
+        }
+        else{
+            dc[i]->minusPatch = NULL;
+        }
+        
+        token = strtok(NULL, ":");
+        if(strcmp(token,"NULL")!=0){
+            dc[i]->plusPatch = (ObjectBinary*)malloc(sizeof(ObjectBinary));
+            printf("byteCount: %s\n",token);
+            dc[i]->plusPatch->byteCount = atoi(token);
+            
+            token = strtok(NULL, ":");
+            printf("schemaCode: %s\n",token);
+            dc[i]->plusPatch->schemaCode = atoi(token);
+            
+            token = strtok(NULL, ":");
+            printf("plus: %s\n",token);
+            dc[i]->plusPatch->data = strdup(token);
+        }
+        else{
+            dc[i]->plusPatch = NULL;
+        }
+        
+        token = strtok(NULL, ":");
+        if(strcmp(token,"NULL")!=0){
+            dc[i]->fullContent = (ObjectBinary*)malloc(sizeof(ObjectBinary));
+            printf("byteCount: %s\n",token);
+            dc[i]->fullContent->byteCount = atoi(token);
+            
+            token = strtok(NULL, ":");
+            printf("schemaCode: %s\n",token);
+            dc[i]->fullContent->schemaCode = atoi(token);
+            
+            token = strtok(NULL, ":");
+            printf("full: %s\n",token);
+            dc[i]->fullContent->data = strdup(token);
+        }
+        else{
+            dc[i]->fullContent = NULL;
+        }
+    }
+    dc[0]->preVersion = NULL;
+    dc[count-1]->nextVersion = NULL;
+    free(dc);
+    
+    return dt;
+}
+
+char** getOrgID(DTPacket* dtPacket){
+    char** list = getDataFromDataID(NULL, _org,dtPacket);
+    return list;
+}
+
+char** getUserFromOrgID(char* orgID, DTPacket* dtPacket){
+    char** list = getDataFromDataID(orgID, _user,dtPacket);
+    return list;
+}
+
+char** getCatFromUserID(char* userID, DTPacket* dtPacket){
+    char** list = getDataFromDataID(userID, _category,dtPacket);
+    return list;
+}
+
+char** getStateFromCatID(char* catID, DTPacket* dtPacket){
+    char** list = getDataFromDataID(catID, _state,dtPacket);
+    return list;
+}
+
+char** getTaskFromStateID(char* stateID, DTPacket* dtPacket){
+    char** list = getDataFromDataID(stateID, _task,dtPacket);
+    return list;
+    
+}
+
+char** getSubTaskFromTaskID(char* taskID, DTPacket* dtPacket){
+    char** list = getDataFromDataID(taskID, _subTask,dtPacket);
+    return list;
+}
+
+char** getTaskFromCatID(char* catID, DTPacket* dtPacket){
+    char** list = getDataFromDataID(catID, _task,dtPacket);
+    return list;
+}
+
+char** getDataFromDataID(char* dataID, int dType, DTPacket* dtPacket){
+    char sql[MAX_SQL_SIZE];
+    char *token, *result;
+    switch(dType){
+        case _org:
+        printf("--------------------------------------------------[get dataID,dataName_user]\n");
+        sprintf(sql,"select dataID,dataName from data where dataType=%d)",_org);
+        printf("SQL: %s\n",sql);
+        result = getContent(sql,dtPacket);
+        if(result==NULL){
+            printf("not found any org\n");
+            return NULL;
+        }
+        break;
+        case _user:
+        printf("--------------------------------------------------[get dataID,dataName_user]\n");
+        sprintf(sql,"select dataID,dataName from (select expand(out('toUser')) from data where dataID='%s')",dataID);
+        printf("SQL: %s\n",sql);
+        result = getContent(sql,dtPacket);
+        if(result==NULL){
+            printf("not found any user\n");
+            return NULL;
+        }
+        break;
+        case _category:
+        printf("--------------------------------------------------[get dataID,dataName_category]\n");
+        sprintf(sql,"select dataID,dataName from (select expand(out('toCategory')) from data where dataID='%s')",dataID);
+        printf("SQL: %s\n",sql);
+        result = getContent(sql,dtPacket);
+        if(result==NULL){
+            printf("not found any category\n");
+            return NULL;
+        }
+        break;
+        case _state:
+        printf("--------------------------------------------------[get dataID,dataName_state]\n");
+        sprintf(sql,"select dataID,dataName from (select expand(out('toState')) from data where dataID='%s')",dataID);
+        printf("SQL: %s\n",sql);
+        result = getContent(sql,dtPacket);
+        if(result==NULL){
+            printf("not found any state\n");
+            return NULL;
+        }
+        break;
+        case _task:
+        printf("--------------------------------------------------[get dataID,dataName_task]\n");
+        sprintf(sql,"select dataID,dataName from (select expand(out('toTask')) from data where dataID='%s')",dataID);
+        printf("SQL: %s\n",sql);
+        result = getContent(sql,dtPacket);
+        if(result==NULL){
+            printf("not found any task\n");
+            return NULL;
+        }
+        break;
+        case _subTask:
+        printf("--------------------------------------------------[get dataID,dataName_subTask]\n");
+        sprintf(sql,"select dataID,dataName from (select expand(out('toSubTask')) from data where dataID='%s')",dataID);
+        printf("SQL: %s\n",sql);
+        result = getContent(sql,dtPacket);
+        if(result==NULL){
+            printf("not found any subTask\n");
+            return NULL;
+        }
+        break;
+        default:
+        return NULL;
+        break;
+    }
+    
+    printf("result: %s\n",result);
+    char* res=strdup(result);
+    int count=0;
+    token=strtok(result,"#");
+    while(token!=NULL){
+        count++;
+        token=strtok(NULL, "#");
+    }
+    free(result);
+    
+    char** list = (char**)malloc(sizeof(char*)*(count+1));
+    list[count] = NULL;
+    printf("count: %d\n",count);
+    int i,len_str;
+    char *tmp_id, *tmp_name;
+    token = strtok(res,"\"");
+    for(i=0;i<count;i++){
+//        printf("\n\ntoken: %s\n",token);
+        token=strtok(NULL, "\"");
+        printf("dataID: %s\n",token);
+        len_str = strlen(token);
+        tmp_id = strdup(token);
+        
+        token=strtok(NULL, "\"");
+        token=strtok(NULL, "\"");
+        printf("dataName: %s\n",token);
+        len_str = len_str + strlen(token);
+        tmp_name = strdup(token);
+
+        token=strtok(NULL, "\"");
+        
+        list[i] = (char*) malloc(sizeof(char)*(len_str+2));
+        sprintf(list[i],"%s:%s",tmp_id,tmp_name);
+//        printf("len(m): %d\n",len_str+2);
+//        printf("len: %d\n",strlen(list[i]));
+        printf("list[%d]: %s\n",i,list[i]);
+        len_str=0;
+        free(tmp_id);
+        free(tmp_name);
+    }
+    free(res);
+    
+    return list;
+}

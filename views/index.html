@@ -7,49 +7,38 @@
   <link rel="stylesheet" href="css/jquery.treemenu.css">
 </head>
 <body>
-<div class="header">
-  <div class="container">
-    <div class="row">
-      <div class="loginBox inline">
-        <input class="form-control inline input-sm custom-size" id="loginName" type="text" placeholder="Username">
-      <button type="button" class="btn btn-default btn-sm" onclick="req(11)">Login</button>
-      </div>
-      <div class="cloneBox inline none">
-        Send : 
-        <input class="form-control inline input-sm custom-size" id="selectId" type="text"placeholder="DataId">
-        ->
-        <input class="form-control inline input-sm custom-size" id="selectUsername" type="text" placeholder="toUsername">
-        <button type="button" class="btn btn-default btn-sm" onclick="req(12)">Submit</button>
-      </div>
-    </div>
-    <div class="row underrow">
-      <div class="queryBox inline none">
-        <input class="form-control inline input-sm" style="width: 255px;" id="queryId" type="text" placeholder="UserId">
-      <button type="button" class="btn btn-default btn-sm" onclick="req(13)">Query</button>
+  <div class="header">
+    <div class="container">
+      <div class="row">
+        <div class="loginBox inline">
+          <input class="form-control inline input-sm custom-size" id="loginName" type="text" placeholder="Username">
+          <button type="button" class="btn btn-default btn-sm" onclick="req(11)">Login</button>
+        </div>      
       </div>
     </div>
   </div>
-</div>
-  <div class="container">
-    <div>
+  <div class="container-left">
+    <div id="main-tree">
       <ul class="tree">
         <li>
-          <a href="#">Organize</a>
-          <!-- <button type="button" class="btn btn-default btn-xs" onclick="openform('org')">
+          <a onclick="query(7, '', this)">Organize</a>
+          <!-- <button type="button" class="btn btn-default btn-xs" onclick="openform(this)">
             <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
-          </button> -->
-          <!-- form -->
+          </button>
+          
           <div class="inline none" id="orgForm">
             <input class="form-control inline input-sm custom-size" id="orgInput" type="text">
-            <button type="button" class="btn btn-default btn-xs" onclick="req(1)">add</button>
-          </div>
+            <button type="button" class="btn btn-default btn-xs" onclick="req(1, this)">add</button>
+          </div> -->
           <ul id="orgHead">
-            <li>
+
+
+            <!-- <li>
               <a href="#">User</a>
-              <!-- <button type="button" class="btn btn-default btn-xs" onclick="openform('user')">
+              <button type="button" class="btn btn-default btn-xs" onclick="openform(this)">
                 <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
-              </button> -->
-              <!-- form -->
+              </button>
+              
               <div class="inline none" id="userForm">
                 <input class="form-control inline input-sm custom-size" id="userInput" type="text">
                 <button type="button" class="btn btn-default btn-xs" onclick="req(2)">add</button>
@@ -57,10 +46,10 @@
               <ul id="userHead">
                 <li>
                   <a href="#">Category</a>
-                  <button type="button" class="btn btn-default btn-xs" onclick="openform('category')">
+                  <button type="button" class="btn btn-default btn-xs" onclick="openform(this)">
                     <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
                   </button>
-                  <!-- form -->
+                  
                   <div class="inline none" id="categoryForm">
                     <input class="form-control inline input-sm custom-size" id="categoryInput" type="text">
                     <button type="button" class="btn btn-default btn-xs" onclick="req(3)">add</button>
@@ -68,10 +57,10 @@
                   <ul id="categoryHead" class="none">
                     <li>
                       <a href="#">State</a>
-                      <button type="button" class="btn btn-default btn-xs" onclick="openform('state')">
+                      <button type="button" class="btn btn-default btn-xs" onclick="openform(this)">
                         <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
                       </button>
-                      <!-- form -->
+                      
                       <div class="inline none" id="stateForm">
                         <input class="form-control inline input-sm custom-size" id="stateInput" type="text">
                         <button type="button" class="btn btn-default btn-xs" onclick="req(4)">add</button>
@@ -79,10 +68,10 @@
                       <ul id="stateHead" class="none">
                         <li>
                           <a href="#">Task</a>
-                          <button type="button" class="btn btn-default btn-xs" onclick="openform('task')">
+                          <button type="button" class="btn btn-default btn-xs" onclick="openform(this)">
                             <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
                           </button>
-                          <!-- form -->
+                          
                           <div class="inline none" id="taskForm">
                             <input class="form-control inline input-sm custom-size" id="taskInput" type="text">
                             <button type="button" class="btn btn-default btn-xs" onclick="req(5)">add</button>
@@ -90,10 +79,10 @@
                           <ul id="taskHead" class="none">
                             <li>
                               <a href="#">Subtask</a>
-                              <button type="button" class="btn btn-default btn-xs" onclick="openform('subtask')">
+                              <button type="button" class="btn btn-default btn-xs" onclick="openform(this)">
                                 <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
                               </button>
-                              <!-- form -->
+                              
                               <div class="inline none" id="subtaskForm">
                                 <input class="form-control inline input-sm custom-size" id="subtaskInput" type="text">
                                 <button type="button" class="btn btn-default btn-xs" onclick="req(6)">add</button>
@@ -107,10 +96,10 @@
                       </ul>
                     </li>
                     <li>
-                      <a href="#">Task</a><button type="button" class="btn btn-default btn-xs" onclick="openform('task2')">
+                      <a href="#">Task</a><button type="button" class="btn btn-default btn-xs" onclick="openform()">
                       <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
                     </button>
-                    <!-- form -->
+                    
                     <div class="inline none" id="taskForm2">
                       <input class="form-control inline input-sm custom-size" id="taskInput2" type="text">
                       <button type="button" class="btn btn-default btn-xs" onclick="req(7)">add</button>
@@ -118,10 +107,10 @@
                     <ul id="taskHead2" class="none">
                       <li>
                         <a href="#">Subtask</a>
-                        <button type="button" class="btn btn-default btn-xs" onclick="openform('subtask2')">
+                        <button type="button" class="btn btn-default btn-xs" onclick="openform()">
                           <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
                         </button>
-                        <!-- form -->
+                        
                         <div class="inline none" id="subtaskForm2">
                           <input class="form-control inline input-sm custom-size" id="subtaskInput2" type="text">
                           <button type="button" class="btn btn-default btn-xs" onclick="req(8)">add</button>
@@ -135,11 +124,14 @@
                 </ul>
               </li>
             </ul>
-          </li>
+          </li> -->
+
+
         </ul>
       </li>
     </ul>
   </div>
+  
 
   <!-- Modal -->
   <div class="modal fade" id="editData" role="dialog">
@@ -162,6 +154,45 @@
     </div>
   </div>
 
+</div>
+<div class="container-right">
+  <div class="createBox">
+    <h4>Create data</h4>
+    <select id="createType" onchange="createUI(this)">
+      <option selected disabled>Choose type</option>
+      <option value="org">Organize</option>
+      <option value="user">User</option>
+      <option value="category">Category</option>
+      <option value="state">State</option>
+      <option value="task">Task</option>
+      <option value="subtask">Subtask</option>
+      <option value="task2">TaskfromCat</option>
+      <option value="subtask2">SubtaskfromCat</option>
+    </select>
+    <div class="createForm"></div>
+  </div>
+  <hr>
+  <div class="cloneBox">
+    <h4>Clone data</h4>
+    <input class="form-control inline input-sm custom-size" id="selectId" type="text"placeholder="DataId">
+    ->
+    <input class="form-control inline input-sm custom-size" id="selectUsername" type="text" placeholder="toUsername">
+    <button type="button" class="btn btn-default btn-sm" onclick="req(12)">Send</button>
+  </div>
+  <hr>
+  <div class="queryBox ">
+    <h4>Query data</h4>
+    <input class="form-control inline input-sm id-input" id="queryId" type="text" placeholder="DataId">
+    <button type="button" class="btn btn-default btn-sm" onclick="req(13)">Query</button>
+  </div>
+  <hr>
+  <div class="deleteBox">
+    <h4>Delete data</h4>
+    <input class="form-control inline input-sm id-input" id="objectId" type="text" placeholder="DataId">
+    <input class="form-control inline input-sm id-input" id="deleteUpperId" type="text" placeholder="UpperId">
+    <input class="form-control inline input-sm id-input" id="userUpperId" type="text" placeholder="UserId">
+    <button type="button" class="btn btn-default btn-sm" onclick="deleteData()">Delete</button>
+  </div>
 </div>
 
 <script src="/socket.io/socket.io.js"></script>

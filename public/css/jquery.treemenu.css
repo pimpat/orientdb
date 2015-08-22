@@ -131,7 +131,7 @@ pre {
     width: 150px !important;
 }
 .none{
-    display: none !important;
+    /*display: none !important;*/
 }
 textarea, xmp{
     color: #33495D !important;
@@ -142,11 +142,19 @@ textarea, xmp{
     background-color: #ff8400;
     padding-top: 20px;
     padding-bottom: 20px;
-    margin-bottom: 30px;
 }
-.cloneBox{
-    margin-left: 40px;
+.id-input{
+    width: 255px;
 }
-.underrow{
-    margin-top: 5px;
+.container-left{
+    float: left;
+    width: 70%;
+    padding: 30px 20px 30px 20px;
+
+}
+.container-right{
+    float: right;
+    width: 30%;
+    padding: 30px 20px 30px 20px;
+    background-color: #2ecc71;
 }
