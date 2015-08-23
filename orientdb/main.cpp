@@ -347,7 +347,6 @@ int main() {
 
         if(numtype == 1){
             // create new data
-            char msg[10] = "";
             char new_uuid[100] = "";
             token = strtok(NULL,":");
             int casetype = atoi(token);
@@ -359,13 +358,11 @@ int main() {
             if (casetype == 1){
                 const char *dID = createOrg(Name, newSchema, &dtPacket);
                 strcat(new_uuid, dID);
-                strcat(msg, "Org");
                 printf("---%s\n", upperId);
             }
             else if (casetype == 2){
                 const char *dID = createUser(Name, newSchema, &dtPacket);
                 strcat(new_uuid, dID);
-                strcat(msg, "User");
                 printf("---%s\n", upperId);
                 printf("---%s\n", new_uuid);
                 addUser2OrgByID(upperId, new_uuid, &dtPacket);
@@ -373,7 +370,6 @@ int main() {
             else if (casetype == 3){
                 const char *dID = createCategory(Name, newSchema, &dtPacket);
                 strcat(new_uuid, dID);
-                strcat(msg, "Category");
                 printf("---%s\n", upperId);
                 printf("---%s\n", new_uuid);
                 addCategory2UserByID(upperId, new_uuid, &dtPacket);
@@ -381,7 +377,6 @@ int main() {
             else if (casetype == 4){
                 const char *dID = createState(Name, newSchema, &dtPacket);
                 strcat(new_uuid, dID);
-                strcat(msg, "State");
                 printf("---%s\n", upperId);
                 printf("---%s\n", new_uuid);
                 addState2CategoryByID(upperId, new_uuid, &dtPacket);
@@ -389,7 +384,6 @@ int main() {
             else if (casetype == 5){
                 const char *dID = createTask(Name, newSchema, &dtPacket);
                 strcat(new_uuid, dID);
-                strcat(msg, "Task");
                 printf("---%s\n", upperId);
                 printf("---%s\n", new_uuid);
                 addTask2StateByID(upperId, new_uuid, &dtPacket);
@@ -397,7 +391,6 @@ int main() {
             else if (casetype == 6){
                 const char *dID = createSubTask(Name, newSchema, &dtPacket);
                 strcat(new_uuid, dID);
-                strcat(msg, "Subtask");
                 printf("---%s\n", upperId);
                 printf("---%s\n", new_uuid);
                 addSubTask2TaskByID(upperId, new_uuid, &dtPacket);
@@ -405,7 +398,6 @@ int main() {
             else if (casetype == 7){
                 const char *dID = createTask(Name, newSchema, &dtPacket);
                 strcat(new_uuid, dID);
-                strcat(msg, "Task");
                 printf("---%s\n", upperId);
                 printf("---%s\n", new_uuid);
                 addTask2CategoryByID(upperId, new_uuid, &dtPacket);
@@ -453,19 +445,15 @@ int main() {
             printf("isDiff : %d\n", dData->content->lastestCommon->isDiff);
             printf("----------\n");
 
-            char* strDT = genString(dData);
+            //char* strDT = genString(dData);
+            char* msg = genMsg(dData);
             char rep_str[10000];
-            sprintf(rep_str, "1:%s:%s", msg, strDT);
+            sprintf(rep_str, "1:%s:%s:%s", msg, dData->dataID, dData->dataName);
             printf("%s\n", rep_str);
             s_send(responder, rep_str);
 
-            // free(org_uuid);
-            // free(user_uuid);
-            // free(category_uuid);
-            // free(state_uuid);
-            // free(task_uuid);
-            // free(subtask_uuid);
-            // free(dData);
+            // freeData(dData);
+            // free(msg);
         }
         else if(numtype == 2){
             // edit and save Data
@@ -543,10 +531,10 @@ int main() {
             Data *data = queryDataByID(id, &dtPacket);
             printf("Query Result : %s\n", data);
             if (data != NULL){
-                char* strDT = genString(data);
+                //char* strDT = genString(data);
                 char* msg = genMsg(data);
                 char rep_str[10000];
-                sprintf(rep_str, "1:%s:%s", msg, strDT);
+                sprintf(rep_str, "1:%s:%s:%s", msg, data->dataID, data->dataName);
                 printf(">>>>> Finished Query <<<<<\n");
                 printf("%s\n", rep_str);
                 s_send(responder, rep_str);

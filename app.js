@@ -49,7 +49,7 @@ io.on('connection', function(socket){
       case "6":
       // delete data callback
       console.log(x);
-      socket.emit('notification', x[1]);
+      socket.emit('deleteCallback', x);
       break;
       case "404":
       console.log(x);
