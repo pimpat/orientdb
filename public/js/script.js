@@ -13,6 +13,7 @@ var parentId = "";
 var Id2append = "";
 var currentId = "";
 var createdId_2append = "";
+var org_UIswitch = 1;
 
 var full1 = "";
 var full2 = "";
@@ -102,15 +103,15 @@ socket.on('created', function(data) {
 	var child2 = "";
 
 	if (type == "Subtask") {
-		child2 += "<li><a id='a-"+listID+"' onclick=\"query("+code+", '', this)\">"+listName+"</a>";
+		child2 += "<li class='new-create'><a class='cursor' id='a-"+listID+"' onclick=\"query("+code+", '', this)\">"+listName+"</a>";
 	}
 	else{
-		child2 += "<li id='data-"+listID+"'><a id='a-"+listID+"' onclick=\"query(" + code + ',\'' + listID +"', this)\">"+listName+"</a>";
+		child2 += "<li class='new-create' id='data-"+listID+"'><a class='cursor' id='a-"+listID+"' onclick=\"query(" + code + ',\'' + listID +"', this)\">"+listName+"</a>";
 	}
 	child2 += "<ul id='"+parent+listID+"'></ul>";
 	child2 += "</li>";
 
-
+	// if input form manual query & clone
 	if (separateDisplay == 1) {
 		child += "<hr>";
 		child += "<li><a>"+title+"</a>";	
@@ -120,30 +121,31 @@ socket.on('created', function(data) {
 
 		$("#querydisplay").append(child);
 		$("#query-"+listID).append(child2);
+		$("#querydisplay").treemenu({delay:200}).openActive();
 		separateDisplay = 0 ;
 	}
 	else{
 		if (type != "Org") {
-			child += "<li><a>"+title+"</a>";	
+			child += "<li class='new-create'><a>"+title+"</a>";	
 			child += "<ul id='"+parent+createdId_2append+"'>";
 			child += "</ul>";
 			child += "</li>";	
 
 			$("#"+appendpoint).append(child);
 			$("#"+parent+createdId_2append).append(child2);
-		// fix not necessary title
-		var lastTitle = $("#"+appendpoint).children().last().children().first().text();
-		var prevlastTitle = $("#"+appendpoint).children().last().prev().children().first().text();
-		if (lastTitle == prevlastTitle) {
-			$("#"+appendpoint).children().last().remove();
+			// fix not necessary title
+			var lastTitle = $("#"+appendpoint).children().last().children().first().text();
+			var prevlastTitle = $("#"+appendpoint).children().last().prev().children().next().first().text()
+			if (lastTitle == prevlastTitle) {
+				$("#"+appendpoint).children().last().remove();
+			}
+		}
+		else{
+			$("#"+appendpoint).append(child2);
 		}
 	}
-	else{
-		$("#"+appendpoint).append(child2);
-	}
-}
 
-	// Create Tree UI
+	// gen tree UI
 	// $("#ul-"+dataID).treemenu({delay:200}).openActive();
 });
 
@@ -175,6 +177,7 @@ socket.on('onDatalists', function(data) {
 	var listName = "";
 	var appendpoint = "";
 	var title = "";
+
 
 	if (type == "Org") {
 		parent = "orgHead-";
@@ -241,10 +244,10 @@ socket.on('onDatalists', function(data) {
 		var child2 = "";
 
 		if (type == "Subtask") {
-			child2 += "<li><a id='a-"+listID+"' onclick=\"query("+code+", '', this)\">"+listName+"</a>";
+			child2 += "<li><a class='cursor' id='a-"+listID+"' onclick=\"query("+code+", '', this)\">"+listName+"</a>";
 		}
 		else{
-			child2 += "<li id='data-"+listID+"'><a id='a-"+listID+"' onclick=\"query(" + code + ',\'' + listID +"', this)\">"+listName+"</a>";
+			child2 += "<li id='data-"+listID+"'><a class='cursor' id='a-"+listID+"' onclick=\"query(" + code + ',\'' + listID +"', this)\">"+listName+"</a>";
 		}
 		child2 += "<ul id='"+parent+listID+"'></ul>";
 		child2 += "</li>";
@@ -267,7 +270,10 @@ socket.on('onDatalists', function(data) {
 		}
 	}
 	// $(".tree").treemenu({delay:200}).openActive();
-
+	// gen tree UI
+	if (type == "Org") {
+		$(appendpoint).treemenu({delay:200}).openActive();
+	}
 });
 
 socket.on('genDatafromDatalists', function(data) {
@@ -421,8 +427,15 @@ socket.on('genDatafromDatalists', function(data) {
 
 	parent2.append(child2);
 }
-	// Create Tree UI
-	$("#dataHolder-"+dataID).treemenu({delay:200}).openActive();
+	// gen tree UI
+	if (type == "Category") {
+		setTimeout(function(){
+			$("#"+appendpoint).treemenu({delay:200}).openActive();
+		}, 200);
+	}
+	else{
+		$("#"+appendpoint).treemenu({delay:200}).openActive();
+	}
 });
 
 function create(val){
@@ -600,10 +613,9 @@ function query(val, id, ele){
 		console.log("currentId: "+currentId);
 		Id2append = id;
 		socket.emit('getDatalist', {msg: "6", id: id});
-			//socket.emit('getDatafromDatalist', currentId);
 
-		}
-		else if (val == 7) {
+	}
+	else if (val == 7) {
 		// Get Org lists
 		if ($(ele).hasClass("open")) {
 			$(ele).removeClass("open");
@@ -691,40 +703,44 @@ function createUI(ele) {
 	}
 	else if (val == "user"){
 		child += "<input class='form-control inline input-sm custom-size' id='dataName' type='text'placeholder='DataName'>";
-		child += "<input class='form-control inline input-sm custom-size' id='upperId' type='text' placeholder='OrgId'>";
+		child += "<input class='form-control inline input-sm id-input' id='upperId' type='text' placeholder='OrgId'>";
 		child += "<button type='button' class='btn btn-default btn-sm' onclick='create(2)'>Create</button>";	
 	}
 	else if (val == "category"){
 		child += "<input class='form-control inline input-sm custom-size' id='dataName' type='text'placeholder='DataName'>";
-		child += "<input class='form-control inline input-sm custom-size' id='upperId' type='text' placeholder='UserId'>";
+		child += "<input class='form-control inline input-sm id-input' id='upperId' type='text' placeholder='UserId'>";
 		child += "<button type='button' class='btn btn-default btn-sm' onclick='create(3)'>Create</button>";	
 	}
 	else if (val == "state"){
 		child += "<input class='form-control inline input-sm custom-size' id='dataName' type='text'placeholder='DataName'>";
-		child += "<input class='form-control inline input-sm custom-size' id='upperId' type='text' placeholder='CategoryId'>";
+		child += "<input class='form-control inline input-sm id-input' id='upperId' type='text' placeholder='CategoryId'>";
 		child += "<button type='button' class='btn btn-default btn-sm' onclick='create(4)'>Create</button>";	
 	}
 	else if (val == "task"){
 		child += "<input class='form-control inline input-sm custom-size' id='dataName' type='text'placeholder='DataName'>";
-		child += "<input class='form-control inline input-sm custom-size' id='upperId' type='text' placeholder='StateId'>";
+		child += "<input class='form-control inline input-sm id-input' id='upperId' type='text' placeholder='StateId'>";
 		child += "<button type='button' class='btn btn-default btn-sm' onclick='create(5)'>Create</button>";	
 	}
 	else if (val == "subtask"){
 		child += "<input class='form-control inline input-sm custom-size' id='dataName' type='text'placeholder='DataName'>";
-		child += "<input class='form-control inline input-sm custom-size' id='upperId' type='text' placeholder='TaskId'>";
+		child += "<input class='form-control inline input-sm id-input' id='upperId' type='text' placeholder='TaskId'>";
 		child += "<button type='button' class='btn btn-default btn-sm' onclick='create(6)'>Create</button>";	
 	}
 	else if (val == "task2"){
 		child += "<input class='form-control inline input-sm custom-size' id='dataName' type='text'placeholder='DataName'>";
-		child += "<input class='form-control inline input-sm custom-size' id='upperId' type='text' placeholder='CategoryId'>";
+		child += "<input class='form-control inline input-sm id-input' id='upperId' type='text' placeholder='CategoryId'>";
 		child += "<button type='button' class='btn btn-default btn-sm' onclick='create(7)'>Create</button>";	
 	}
 	else if (val == "subtask2"){
 		child += "<input class='form-control inline input-sm custom-size' id='dataName' type='text'placeholder='DataName'>";
-		child += "<input class='form-control inline input-sm custom-size' id='upperId' type='text' placeholder='TaskId'>";
+		child += "<input class='form-control inline input-sm id-input' id='upperId' type='text' placeholder='TaskId'>";
 		child += "<button type='button' class='btn btn-default btn-sm' onclick='create(8)'>Create</button>";	
 	}
 
 	$(".createForm").empty();
 	$(".createForm").append(child);
 }
+
+$(document).ready(function(){
+	$(".tree").treemenu({delay:200}).openActive();
+});

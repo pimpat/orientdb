@@ -17,12 +17,12 @@
       </div>
     </div>
   </div>
-  <!-- left -->
-  <div class="container-left">
+  <!-- left side -->
+  <div class="container-left col-lg-9 col-md-8 col-sm-8">
     <div id="main-tree">
       <ul class="tree">
         <li>
-          <a onclick="query(7, '', this)">Organize</a>
+          <a class="cursor" onclick="query(7, '', this)">Organize</a>
           <ul id="orgHead">
 
           </ul>
@@ -30,12 +30,13 @@
       </ul>
     </div>
     <!-- query & clone display -->
-    <div class="tree">
-      <ul id="querydisplay"></ul>
+    <div class="separateDisplay">
+      <ul class="tree" id="querydisplay"></ul>
     </div>
   </div>
-  <!-- right -->
-  <div class="container-right">
+  <!-- right side -->
+  <div class="container-right col-lg-3 col-md-4 col-sm-4">
+    <!-- create container -->
     <div class="createBox">
       <h4>Create data</h4>
       <select id="createType" onchange="createUI(this)">
@@ -46,12 +47,14 @@
         <option value="state">State</option>
         <option value="task">Task</option>
         <option value="subtask">Subtask</option>
+        <option disabled>------------------</option>
         <option value="task2">TaskfromCat</option>
         <option value="subtask2">SubtaskfromCat</option>
       </select>
       <div class="createForm"></div>
     </div>
     <hr>
+    <!-- clone container -->
     <div class="cloneBox">
       <h4>Clone data</h4>
       <input class="form-control inline input-sm custom-size" id="selectId" type="text"placeholder="DataId">
@@ -60,12 +63,14 @@
       <button type="button" class="btn btn-default btn-sm" onclick="req(12)">Send</button>
     </div>
     <hr>
+    <!-- query container -->
     <div class="queryBox ">
       <h4>Query data</h4>
       <input class="form-control inline input-sm id-input" id="queryId" type="text" placeholder="DataId">
       <button type="button" class="btn btn-default btn-sm" onclick="req(13)">Query</button>
     </div>
     <hr>
+    <!-- delete container -->
     <div class="deleteBox">
       <h4>Delete data</h4>
       <input class="form-control inline input-sm id-input" id="objectId" type="text" placeholder="DataId">
@@ -76,7 +81,7 @@
   </div>
 
 
-  <!-- Modal -->
+  <!-- edit data Modal -->
   <div class="modal fade" id="editData" role="dialog">
     <div class="modal-dialog">
       <!-- Modal content-->
