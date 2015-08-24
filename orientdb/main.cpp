@@ -305,8 +305,6 @@ int main() {
     printf("replace: %s\n",result.c_str());
     */
 
-
-
     int ret;
     DTPacket dtPacket;
     dtPacket.Sockfd = connectSocket(&dtPacket);
@@ -321,15 +319,6 @@ int main() {
     int ssid = *(int*)dtPacket.GPacket.ssid;
     swapEndian(&ssid, INT);
     printf("sessionid: %d\n\n",ssid);
-
-    // test_setNewData();
-
-    // char * org_uuid = (char *)malloc(100*sizeof(char));
-    // char * user_uuid = (char *)malloc(100*sizeof(char));
-    // char * category_uuid = (char *)malloc(100*sizeof(char));
-    // char * state_uuid = (char *)malloc(100*sizeof(char));
-    // char * task_uuid = (char *)malloc(100*sizeof(char));
-    // char * subtask_uuid = (char *)malloc(100*sizeof(char));
 
     void *context = zmq_ctx_new ();
     void *responder = zmq_socket (context, ZMQ_REP);
@@ -403,35 +392,6 @@ int main() {
                 addTask2CategoryByID(upperId, new_uuid, &dtPacket);
             }
             
-            // if (casetype == 1){
-            //     strcat(new_uuid, "AA8A8F10F4894D0A81254AB9E4C71DAA");
-            //     strcat(msg, "Org");
-            // }
-            // else if (casetype == 2){
-            //     strcat(new_uuid, "F2DC33299B00418A8D15F86FC0C6D5C0");
-            //     strcat(msg, "User");
-            // }
-            // else if (casetype == 3){
-            //     strcat(new_uuid, "D8B7B4BBBEF943BFAFD42584BDCBD351");
-            //     strcat(msg, "Category");
-            // }
-            // else if (casetype == 4){
-            //     strcat(new_uuid, "34D5207389D248D085297668A3D1D07B");
-            //     strcat(msg, "State");
-            // }
-            // else if (casetype == 5){
-            //     strcat(new_uuid, "CFEB0ABBBABE44C3A0DE11D9E0E44CDF");
-            //     strcat(msg, "Task");
-            // }
-            // else if (casetype == 6){
-            //     strcat(new_uuid, "4BD106FA7B9546AEAD8B40A9456F9E07");
-            //     strcat(msg, "Subtask");
-            // }
-            // else if (casetype == 7){
-            //     strcat(new_uuid, "A64BC8E7D4304996B18B670F51B875CB");
-            //     strcat(msg, "Task");
-            // }
-            
             Data* dData = queryDataByID(new_uuid, &dtPacket);
             printf("--->%s\n", dData->dataID);
             printf("--->%s\n", dData->dataName);
@@ -445,7 +405,6 @@ int main() {
             printf("isDiff : %d\n", dData->content->lastestCommon->isDiff);
             printf("----------\n");
 
-            //char* strDT = genString(dData);
             char* msg = genMsg(dData);
             char rep_str[10000];
             sprintf(rep_str, "1:%s:%s:%s", msg, dData->dataID, dData->dataName);
@@ -507,7 +466,7 @@ int main() {
             }
         }
         else if(numtype == 4){
-            //char uuid[100] = "ADE6EA3EDC1D4119A9B66AE3B7705F0A";
+            // Query data
             token = strtok(NULL,":");
             char *id = strdup(token);
             printf(">>>>> Query function <<<<<\n");
@@ -525,13 +484,11 @@ int main() {
             //     printf("DataNane: %s\n", ddt[i]->dataName);
             //     printf("DataType: %d\n", ddt[i]->dataType);
             //     printf("--------------------------------\n");
-
             // }
 
             Data *data = queryDataByID(id, &dtPacket);
             printf("Query Result : %s\n", data);
             if (data != NULL){
-                //char* strDT = genString(data);
                 char* msg = genMsg(data);
                 char rep_str[10000];
                 sprintf(rep_str, "1:%s:%s:%s", msg, data->dataID, data->dataName);
@@ -755,25 +712,20 @@ int main() {
                     s_send(responder, rep_str);
                 }
                 else{
-                   s_send(responder, "404:Orglists are NULL");
-               }
-           }
-       }
-       else if(numtype == 8){
+                 s_send(responder, "404:Orglists are NULL");
+             }
+         }
+     }
+     else if(numtype == 8){
         // Query DatafromDatalists
-
         token = strtok(NULL,":");
         char *id = strdup(token);
-        printf("----->>>%s\n", id);
         Data *Qdata = queryDataByID(id, &dtPacket);
         if (Qdata != NULL){
             char* strDT = genString(Qdata);
-            printf("----->>>111");
             char* msg = genMsg(Qdata);
-            printf("----->>>222");
             char rep_str[100000];
             sprintf(rep_str, "5:%s:%s", msg, strDT);
-            printf(">>>>> Finished Query <<<<<\n");
             printf("%s\n", rep_str);
             s_send(responder, rep_str);
         }
@@ -781,10 +733,70 @@ int main() {
             s_send(responder, "404:not found data");
         }
     }
+    else if(numtype == 9){
+        // add Edge
+        token = strtok(NULL,":");
+        int casetype = atoi(token);
+        token = strtok(NULL,":");
+        char *Ldata = strdup(token);
+        token = strtok(NULL,":");
+        char *Rdata = strdup(token);     
+        if (casetype == 1){
+            int chk = addUser2OrgByID(Rdata, Ldata, &dtPacket);
+            if (chk == 0){
+                s_send(responder, "404:add User -> Org success");
+            }
+            else{
+                s_send(responder, "404:add User -> Org error!");
+            } 
+        }
+        else if (casetype == 2){
+            int chk = addCategory2UserByID(Rdata, Ldata, &dtPacket);
+            if (chk == 0){
+                s_send(responder, "404:add Category -> User success");
+            }
+            else{
+                s_send(responder, "404:add Category -> User error!");
+            }
+        }
+        else if (casetype == 3){
+            int chk = addState2CategoryByID(Rdata, Ldata, &dtPacket);
+            if (chk == 0){
+                s_send(responder, "404:add State -> Category success");
+            }
+            else{
+                s_send(responder, "404:add State -> Category error!");
+            }
+        }
+        else if (casetype == 4){
+            int chk = addTask2StateByID(Rdata, Ldata, &dtPacket);
+            if (chk == 0){
+                s_send(responder, "404:add Task -> State success");
+            }
+            else{
+                s_send(responder, "404:add Task -> State error!");
+            }
+        }
+        else if (casetype == 5){
+            int chk = addSubTask2TaskByID(Rdata, Ldata, &dtPacket);
+            if (chk == 0){
+                s_send(responder, "404:add Subtask -> Task success");
+            }
+            else{
+                s_send(responder, "404:add Subtask -> Task error!");
+            }
+        }
+        else if (casetype == 6){
+            int chk = addTask2CategoryByID(Rdata, Ldata, &dtPacket);
+            if (chk == 0){
+                s_send(responder, "404:add Task -> Category success");
+            }
+            else{
+                s_send(responder, "404:add Task -> Category error!");
+            }
+        }
+    }
 
-
-        //free(str);
-        //free(token);
 
 }
 test_setNewData();

@@ -1,33 +1,7 @@
-var dataName = "";
-var dataID = "";
-var dataType = "";
-var chatRoom = "";
-var verKeeped = "";
-var SHA256 = "";
-var timestamp = "";
-var isdiff = "";
-var userHolder = "A, B, C";
-var headLineId = "";
-var parentId = "";
-
 var Id2append = "";
 var currentId = "";
 var createdId_2append = "";
-var org_UIswitch = 1;
-
-var full1 = "";
-var full2 = "";
-var full3 = "";
-var minus1 = "";
-var minus2 = "";
-var minus3 = "";
-var plus1 = "";
-var plus2 = "";
-var plus3 = "";
-
 var newWay = 0;
-var deleteable = 0;
-var dataLine = 0;
 var separateDisplay = 0;
 
 var socket = io.connect('http://localhost:3333');
@@ -144,9 +118,7 @@ socket.on('created', function(data) {
 			$("#"+appendpoint).append(child2);
 		}
 	}
-
-	// gen tree UI
-	// $("#ul-"+dataID).treemenu({delay:200}).openActive();
+	alert("Create "+type+" "+listName+" success");
 });
 
 socket.on('loginSuccess', function(data) {
@@ -177,7 +149,6 @@ socket.on('onDatalists', function(data) {
 	var listName = "";
 	var appendpoint = "";
 	var title = "";
-
 
 	if (type == "Org") {
 		parent = "orgHead-";
@@ -269,7 +240,7 @@ socket.on('onDatalists', function(data) {
 			$(appendpoint).append(child2);
 		}
 	}
-	// $(".tree").treemenu({delay:200}).openActive();
+
 	// gen tree UI
 	if (type == "Org") {
 		$(appendpoint).treemenu({delay:200}).openActive();
@@ -278,11 +249,26 @@ socket.on('onDatalists', function(data) {
 
 socket.on('genDatafromDatalists', function(data) {
 	console.log(data);
-	dataName = data[2];
-	dataID = data[3];
-	dataType = data[4];
-	chatRoom = data[5];
-	verKeeped = data[6];
+	var dataName = data[2];
+	var dataID = data[3];
+	var dataType = data[4];
+	var chatRoom = data[5];
+	var verKeeped = data[6];
+	var userHolder = "A, B, C";
+
+	var SHA256 = "";
+	var timestamp = "";
+	var isdiff = "";
+	var full1 = "";
+	var full2 = "";
+	var full3 = "";
+	var minus1 = "";
+	var minus2 = "";
+	var minus3 = "";
+	var plus1 = "";
+	var plus2 = "";
+	var plus3 = "";
+
 	var type = data[1];
 	var appendpoint = "";
 
@@ -323,16 +309,12 @@ socket.on('genDatafromDatalists', function(data) {
   // Create to DataHolder
   $("#"+appendpoint).removeClass("none");
   var parent = $("#"+appendpoint);
-
   var child = "";
-  
-  //child += "<button type='button' class='btn btn-primary btn-xs' onclick=\"clone('" + dataID + "')\">clone</button>";
 
   child += "<li><a class='dataid'>dataID : "+dataID+"</a></li>";
   child += "<li><a>dataType : "+dataType+"</a></li>";
   child += "<li>";
   child += "<a id='chatroom'>Chatroom : "+chatRoom+"</a>";
-  //child += "<button type='button' class='btn btn-default btn-xs' data-toggle='modal' data-target='#editData' onclick=\"getdata2modal('" + dataID + '\',\'' + full3 +"')\">edit</button>";
   child += "</li>";
   child += "<li><a>UserHolder : "+userHolder+"</a></li>";
   child += "<li><a>DataHolder</a>";
@@ -444,84 +426,110 @@ function create(val){
 		var upperid = $("#upperId").val();
 		createdId_2append = upperid;
 	}
-	if (val == 1) {
-	 // create Org
-	 socket.emit('createData', {msg: "1", name: name});
+	if (name && !upperid) {
+		if (val == 1) {
+			// create Org
+			socket.emit('createData', {msg: "1", name: name});
+		}
+		else{
+			alert("Please fill in all 'Create data' fields");
+		}
 	}
-	else if (val == 2) {
-	 // create User
-	 socket.emit('createData', {msg: "2", name: name, upperid: upperid});
+	else if (name && upperid){
+		if (val == 2) {
+			// create User
+			socket.emit('createData', {msg: "2", name: name, upperid: upperid});
+		}
+		else if (val == 3) {
+			// create Category
+			socket.emit('createData', {msg: "3", name: name, upperid: upperid});
+		}
+		else if (val == 4) {
+			// create state
+			socket.emit('createData', {msg: "4", name: name, upperid: upperid});
+		}
+		else if (val == 5) {
+			// create Task
+			socket.emit('createData', {msg: "5", name: name, upperid: upperid});
+		}
+		else if (val == 6) {
+			// create Subtask
+			socket.emit('createData', {msg: "6", name: name, upperid: upperid});
+		}
+		else if (val == 7) {
+			// create Task2
+			socket.emit('createData', {msg: "7", name: name, upperid: upperid});
+			newWay = 1;
+		}
+		else if (val == 8) {
+			// create Subtask2
+			socket.emit('createData', {msg: "6", name: name, upperid: upperid});
+			newWay = 1;
+		}
 	}
-	else if (val == 3) {
-	 // create Category
-	 socket.emit('createData', {msg: "3", name: name, upperid: upperid});
-	}
-	else if (val == 4) {
-	 // create state
-	 socket.emit('createData', {msg: "4", name: name, upperid: upperid});
-	}
-	else if (val == 5) {
-	 // create Task
-	 socket.emit('createData', {msg: "5", name: name, upperid: upperid});
-	}
-	else if (val == 6) {
-	 // create Subtask
-	 socket.emit('createData', {msg: "6", name: name, upperid: upperid});
-	}
-	else if (val == 7) {
-	 // create Task2
-	 socket.emit('createData', {msg: "7", name: name, upperid: upperid});
-	 newWay = 1;
-	}
-	else if (val == 8) {
-	 // create Subtask2
-	 socket.emit('createData', {msg: "6", name: name, upperid: upperid});
-	 newWay = 1;
-	}
+	else{
+		alert("Please fill in all 'Create data' fields");
+	}	
 }
 
 function deleteData(){
 	var objId = $("#objectId").val();
 	var upperId = $("#deleteUpperId").val();
 	var userId = $("#userUpperId").val();
-	socket.emit('deleteData', {objId: objId, upperId: upperId, userId: userId});
+	if (objId && upperId && userId) {
+		socket.emit('deleteData', {objId: objId, upperId: upperId, userId: userId});
+	}
+	else{
+		alert("Please fill in all 'Delete data' fields");
+	}
 }
 
-function req(val, ele){
-	if (val == 9) {
-	 // saveDatacontent
-	 var content = $("#edit-dataContent").val();
-	 var dataid = $("#edit-dataId").text();
-	 socket.emit('editData', {id: dataid, content: content});
-	 $("#data-"+currentId).children().last().empty();
-	 $('#editData').modal('hide');
+function login2transport(){
+	var name = $("#loginName").val();
+	if (name) {
+		socket.emit('login', name);
+		$("#loginName").val("Login as "+name);
 	}
-	else if (val == 10) {
-	 // queryOrgFromData
-	 socket.emit('queryData', "Hello");
+	else{
+		alert("Please fill yourname");
+	}  
+	
+}
+
+function editDatacontent(){
+	var content = $("#edit-dataContent").val();
+	var dataid = $("#edit-dataId").text();
+	if (content && dataid) {
+		socket.emit('editData', {id: dataid, content: content});
+		$("#data-"+currentId).children().last().empty();
+		$('#editData').modal('hide');
 	}
-	else if (val == 11) {
-	 // Login
-	 var name = $("#loginName").val();    
-	 socket.emit('login', name);
-	 $(".cloneBox").removeClass("none");
-	 $(".queryBox").removeClass("none");
-	 $("#loginName").val("Login as "+name);
-	 $("#loginName").attr("disabled", "disabled");
-	 $(".loginBox button").attr("disabled", "disabled");
+	else{
+		alert("Please fill in all 'Edit data' fields");
 	}
-	else if (val == 12) {
-	 // Clone Data
-	 var dataid = $("#selectId").val();
-	 var toUsername = $("#selectUsername").val();
-	 socket.emit('cloneData', {id: dataid, user: toUsername});
-	 separateDisplay = 1;
+}
+
+function cloneData(){
+	var dataid = $("#selectId").val();
+	var toUsername = $("#selectUsername").val();
+	if (dataid && toUsername) {
+		socket.emit('cloneData', {id: dataid, user: toUsername});
+		separateDisplay = 1;
 	}
-	else if (val == 13) {
-	 // Query Data
-	 var dataid = $("#queryId").val();
-	 socket.emit('queryData', dataid);
-	 separateDisplay = 1;
+	else{
+		alert("Please fill in all 'Clone data' fields");
+	}
+	
+}
+
+function manualQueryData(){
+	var dataid = $("#queryId").val();
+	if (dataid) {
+		socket.emit('queryData', dataid);
+		separateDisplay = 1;
+	}
+	else{
+		alert("Please input dataID");
 	}
 }
 
@@ -678,9 +686,36 @@ function query(val, id, ele){
 	}
 }
 
+function addEdge(val){
+	var Ldata = $("#Ldata").val();
+	var Rdata = $("#Rdata").val();
+	if (Ldata && Rdata) {
+		if (val == 1){
+			socket.emit('addEdge', {msg: "1", Ldata: Ldata, Rdata: Rdata});
+		}
+		else if (val == 2){
+			socket.emit('addEdge', {msg: "2", Ldata: Ldata, Rdata: Rdata});
+		}
+		else if (val == 3){
+			socket.emit('addEdge', {msg: "3", Ldata: Ldata, Rdata: Rdata});
+		}
+		else if (val == 4){
+			socket.emit('addEdge', {msg: "4", Ldata: Ldata, Rdata: Rdata});
+		}
+		else if (val == 5){
+			socket.emit('addEdge', {msg: "5", Ldata: Ldata, Rdata: Rdata});
+		}
+		else if (val == 6){
+			socket.emit('addEdge', {msg: "6", Ldata: Ldata, Rdata: Rdata});
+		}
+	}
+	else{
+		alert("Please fill in all 'Add edge' fields");
+	}
+}
 
-function openform(val) {
-	if ($(val).next("div").hasClass("none")) {
+function openform(val){
+	if ($(val).next("div").hasClass("none")){
 		$(val).next("div").removeClass("none");
 	}
 	else{
@@ -688,7 +723,7 @@ function openform(val) {
 	}
 }
 
-function getdata2modal(id, ele) {
+function getdata2modal(id, ele){
 	var content = $(ele).prev().text();
 	$("#edit-dataContent").val(content);
 	$("#edit-dataId").html(id);
@@ -697,48 +732,88 @@ function getdata2modal(id, ele) {
 function createUI(ele) {
 	var val = $(ele).val();	
 	var child = "";
-	if (val == "org") {
-		child += "<input class='form-control inline input-sm custom-size' id='dataName' type='text'placeholder='DataName'>";
+	if (val == "org"){
+		child += "<input class='form-control inline input-sm custom-size' id='dataName' type='text' placeholder='DataName'>";
 		child += "<button type='button' class='btn btn-default btn-sm' onclick='create(1)'>Create</button>";
 	}
 	else if (val == "user"){
-		child += "<input class='form-control inline input-sm custom-size' id='dataName' type='text'placeholder='DataName'>";
-		child += "<input class='form-control inline input-sm id-input' id='upperId' type='text' placeholder='OrgId'>";
+		child += "<input class='form-control inline input-sm custom-size' id='dataName' type='text' placeholder='DataName'>";
+		child += "<input class='form-control inline input-sm id-input' id='upperId' type='text' placeholder='OrgID'>";
 		child += "<button type='button' class='btn btn-default btn-sm' onclick='create(2)'>Create</button>";	
 	}
 	else if (val == "category"){
-		child += "<input class='form-control inline input-sm custom-size' id='dataName' type='text'placeholder='DataName'>";
-		child += "<input class='form-control inline input-sm id-input' id='upperId' type='text' placeholder='UserId'>";
+		child += "<input class='form-control inline input-sm custom-size' id='dataName' type='text' placeholder='DataName'>";
+		child += "<input class='form-control inline input-sm id-input' id='upperId' type='text' placeholder='UserID'>";
 		child += "<button type='button' class='btn btn-default btn-sm' onclick='create(3)'>Create</button>";	
 	}
 	else if (val == "state"){
-		child += "<input class='form-control inline input-sm custom-size' id='dataName' type='text'placeholder='DataName'>";
-		child += "<input class='form-control inline input-sm id-input' id='upperId' type='text' placeholder='CategoryId'>";
+		child += "<input class='form-control inline input-sm custom-size' id='dataName' type='text' placeholder='DataName'>";
+		child += "<input class='form-control inline input-sm id-input' id='upperId' type='text' placeholder='CategoryID'>";
 		child += "<button type='button' class='btn btn-default btn-sm' onclick='create(4)'>Create</button>";	
 	}
 	else if (val == "task"){
-		child += "<input class='form-control inline input-sm custom-size' id='dataName' type='text'placeholder='DataName'>";
-		child += "<input class='form-control inline input-sm id-input' id='upperId' type='text' placeholder='StateId'>";
+		child += "<input class='form-control inline input-sm custom-size' id='dataName' type='text' placeholder='DataName'>";
+		child += "<input class='form-control inline input-sm id-input' id='upperId' type='text' placeholder='StateID'>";
 		child += "<button type='button' class='btn btn-default btn-sm' onclick='create(5)'>Create</button>";	
 	}
 	else if (val == "subtask"){
-		child += "<input class='form-control inline input-sm custom-size' id='dataName' type='text'placeholder='DataName'>";
-		child += "<input class='form-control inline input-sm id-input' id='upperId' type='text' placeholder='TaskId'>";
+		child += "<input class='form-control inline input-sm custom-size' id='dataName' type='text' placeholder='DataName'>";
+		child += "<input class='form-control inline input-sm id-input' id='upperId' type='text' placeholder='TaskID'>";
 		child += "<button type='button' class='btn btn-default btn-sm' onclick='create(6)'>Create</button>";	
 	}
 	else if (val == "task2"){
-		child += "<input class='form-control inline input-sm custom-size' id='dataName' type='text'placeholder='DataName'>";
-		child += "<input class='form-control inline input-sm id-input' id='upperId' type='text' placeholder='CategoryId'>";
+		child += "<input class='form-control inline input-sm custom-size' id='dataName' type='text' placeholder='DataName'>";
+		child += "<input class='form-control inline input-sm id-input' id='upperId' type='text' placeholder='CategoryID'>";
 		child += "<button type='button' class='btn btn-default btn-sm' onclick='create(7)'>Create</button>";	
 	}
 	else if (val == "subtask2"){
-		child += "<input class='form-control inline input-sm custom-size' id='dataName' type='text'placeholder='DataName'>";
-		child += "<input class='form-control inline input-sm id-input' id='upperId' type='text' placeholder='TaskId'>";
+		child += "<input class='form-control inline input-sm custom-size' id='dataName' type='text' placeholder='DataName'>";
+		child += "<input class='form-control inline input-sm id-input' id='upperId' type='text' placeholder='TaskID'>";
 		child += "<button type='button' class='btn btn-default btn-sm' onclick='create(8)'>Create</button>";	
 	}
-
 	$(".createForm").empty();
 	$(".createForm").append(child);
+}
+
+function addEdgeUI(ele){
+	var val = $(ele).val();	
+	var child = "";
+	if (val == 1){
+		child += "<input class='form-control inline input-sm id-input' id='Ldata' type='text' placeholder='UserID'>";
+		child += "<input class='form-control inline input-sm id-input' id='Rdata' type='text' placeholder='OrgID'>";
+		child += "<button type='button' class='btn btn-default btn-sm' onclick='addEdge(1)'>Add</button>";
+	}
+	else if (val == 2){
+		child += "<input class='form-control inline input-sm id-input' id='Ldata' type='text' placeholder='CategoryID'>";
+		child += "<input class='form-control inline input-sm id-input' id='Rdata' type='text' placeholder='UserID'>";
+		child += "<button type='button' class='btn btn-default btn-sm' onclick='addEdge(2)'>Add</button>";
+	}
+	else if (val == 3){
+		child += "<input class='form-control inline input-sm id-input' id='Ldata' type='text' placeholder='StateID'>";
+		child += "<input class='form-control inline input-sm id-input' id='Rdata' type='text' placeholder='CategoryID'>";
+		child += "<button type='button' class='btn btn-default btn-sm' onclick='addEdge(3)'>Add</button>";
+	}
+	else if (val == 4){
+		child += "<input class='form-control inline input-sm id-input' id='Ldata' type='text' placeholder='TaskID'>";
+		child += "<input class='form-control inline input-sm id-input' id='Rdata' type='text' placeholder='StateID'>";
+		child += "<button type='button' class='btn btn-default btn-sm' onclick='addEdge(4)'>Add</button>";
+	}
+	else if (val == 5){
+		child += "<input class='form-control inline input-sm id-input' id='Ldata' type='text' placeholder='SubtaskID'>";
+		child += "<input class='form-control inline input-sm id-input' id='Rdata' type='text' placeholder='TaskID'>";
+		child += "<button type='button' class='btn btn-default btn-sm' onclick='addEdge(5)'>Add</button>";
+	}
+	else if (val == 6){
+		child += "<input class='form-control inline input-sm id-input' id='Ldata' type='text' placeholder='TaskID'>";
+		child += "<input class='form-control inline input-sm id-input' id='Rdata' type='text' placeholder='CategoryID'>";
+		child += "<button type='button' class='btn btn-default btn-sm' onclick='addEdge(6)'>Add</button>";
+	}
+	$(".edgeForm").empty();
+	$(".edgeForm").append(child);
+}
+
+function clearSeparatedisplay(){
+	$("#querydisplay").empty();
 }
 
 $(document).ready(function(){
