@@ -20,7 +20,7 @@ int disconnectServer(DTPacket* dtPacket);
 int createDatabase(char *dbName, DTPacket* dtPacket);
 int createClass(char *myclass, char *extend, DTPacket* dtPacket);
 int prepareDB(DTPacket* dtPacket);
-int openDatabase(char *dbName, DTPacket* dtPacket);
+int _openDatabase(char *dbName, DTPacket* dtPacket);
 int sendCommand(char *command, DTPacket* dtPacket);
 int createVertex(char *command, short* cltid, long* rid, DTPacket* dtPacket);
 char* getContent(char *query, DTPacket* dtPacket);

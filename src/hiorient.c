@@ -275,7 +275,7 @@ int prepareDB(DTPacket* dtPacket) {
     return 0;
 }
 
-int openDatabase(char *dbName, DTPacket* dtPacket) {
+int _openDatabase(char *dbName, DTPacket* dtPacket) {
     printf("Opening Database...\n");
     int ret, size, i;
     //  testPacket
