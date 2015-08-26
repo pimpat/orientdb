@@ -46,11 +46,36 @@ int main() {
      printf("replace: %s\n",result.c_str());
      */
     
-    test_setNewData();
-    return 0;
+    /*
+    char x[15] = "1:20:300:4000";
+    char y[10] = "a:b:c";
+    char* tmp;
+    int i;
+    char *ptr, *ptr2;
+    char *res2;
     
-//    testWeb();
+    char* res1 = strtok_r(x,":",&ptr);
+    while(res1!=NULL){
+        printf("res: %s\n",res1);
+        res1 = strtok_r(NULL,":",&ptr);
+//        res1 = strtok(NULL,":");
+        
+        tmp = strdup(y);
+        res2 = strtok_r(tmp,":",&ptr2);
+//        char *res2 = strtok(tmp,":");
+        while(res2!=NULL){
+//            printf("res(in): %s\n",res2);
+            res2 = strtok_r(NULL,":",&ptr2);
+        }
+        free(tmp);
+    }
+    */
+    
+//    test_setNewData();
 //    return 0;
+    
+    testWeb();
+    return 0;
 }
 
 void test_setNewData(){
@@ -597,6 +622,89 @@ void testWeb(){
         if(numtype == 1){
             printf("[#%d create new data]----------------------\n",numtype);
             
+            const char* dtID;
+            
+            token = strtok(NULL,":");
+            int casetype = atoi(token);
+            
+            token = strtok(NULL,":");
+            char *dtName = strdup(token);
+            printf("dtName: %s\n", dtName);
+            
+            token = strtok(NULL,":");
+            char *upperID = strdup(token);
+            printf("upperID: %s\n", upperID);
+            
+            if (casetype == 1){
+                dtID = createOrg(dtName, newSchema, &dtPacket);
+                printf("dtID: %s\n",dtID);
+            }
+            else if (casetype == 2){
+                dtID = createUser(dtName, newSchema, &dtPacket);
+                printf("dtID: %s\n",dtID);
+                addUser2OrgByID(upperID, (char*)dtID, &dtPacket);
+            }
+            else if (casetype == 3){
+                dtID = createCategory(dtName, newSchema, &dtPacket);
+                printf("dtID: %s\n",dtID);
+                addCategory2UserByID(upperID, (char*)dtID, &dtPacket);
+            }
+            else if (casetype == 4){
+                dtID = createState(dtName, newSchema, &dtPacket);
+                printf("dtID: %s\n",dtID);
+                addState2CategoryByID(upperID, (char*)dtID, &dtPacket);
+            }
+            else if (casetype == 5){
+                dtID = createTask(dtName, newSchema, &dtPacket);
+                printf("dtID: %s\n",dtID);
+                addTask2StateByID(upperID, (char*)dtID, &dtPacket);
+            }
+            else if (casetype == 6){
+                dtID = createSubTask(dtName, newSchema, &dtPacket);
+                printf("dtID: %s\n",dtID);
+                addSubTask2TaskByID(upperID, (char*)dtID, &dtPacket);
+            }
+            else if (casetype == 7){
+                dtID = createTask(dtName, newSchema, &dtPacket);
+                printf("dtID: %s\n",dtID);
+                addTask2CategoryByID(upperID, (char*)dtID, &dtPacket);
+            }
+            
+            Data* dData = queryDataByID((char*)dtID, &dtPacket);
+            
+            //  check data
+            printf("dataID: %s\n", dData->dataID);
+            printf("dataName: %s\n", dData->dataName);
+            printf("dataType: %d\n", dData->dataType);
+            printf("chatRoom: %s\n", dData->chatRoom);
+            printf("--------------------\n");
+            printf("versionKeeped: %d\n", dData->content->versionKeeped);
+            printf("--------------------\n");
+            printf("SHA256hashCode: %s\n", dData->content->lastestCommon->SHA256hashCode);
+            printf("timeStamp: %s\n", dData->content->lastestCommon->timeStamp);
+            printf("isDiff: %d\n", dData->content->lastestCommon->isDiff);
+            printf("--------------------\n");
+            
+            char* msg = genMsg(dData);
+            char rep_str[100];
+            sprintf(rep_str, "1:%s:%s:%s", msg, dData->dataID, dData->dataName);
+            printf("%s\n", rep_str);
+            s_send(responder, rep_str);
+            printf("\n\n");
+            
+            free((char*)dtID);
+            free(dtName);
+            if(upperID!=NULL){
+                free(upperID);
+            }
+            freeData(dData);
+            free(msg);
+            free(str);
+        }
+        /*
+        if(numtype == 1){
+            printf("[#%d create new data]----------------------\n",numtype);
+            
             char msg[10] = "";
             char new_uuid[100] = "";
             token = strtok(NULL,":");
@@ -682,35 +790,6 @@ void testWeb(){
                 free((char*)dID);
             }
             
-            //            if (casetype == 1){
-            //                strcat(new_uuid, "A49A6E33D8884D8CB4BA9AE217F077E9");
-            //                strcat(msg, "Org");
-            //            }
-            //            else if (casetype == 2){
-            //                strcat(new_uuid, "613CC870FA9A4ECABE5E42E3EE66DF15");
-            //                strcat(msg, "User");
-            //            }
-            //            else if (casetype == 3){
-            //                strcat(new_uuid, "A57CA09C802745289C9959EA43D1CF2F");
-            //                strcat(msg, "Category");
-            //            }
-            //            else if (casetype == 4){
-            //                strcat(new_uuid, "E8E045F1C7BF4F3280E3912AE29FA9B8");
-            //                strcat(msg, "State");
-            //            }
-            //            else if (casetype == 5){
-            //                strcat(new_uuid, "236A19345EFB4A16936A9562BAA21D7D");
-            //                strcat(msg, "Task");
-            //            }
-            //            else if (casetype == 6){
-            //                strcat(new_uuid, "ADE6EA3EDC1D4119A9B66AE3B7705F0A");
-            //                strcat(msg, "Subtask");
-            //            }
-            //            else if (casetype == 7){
-            //                strcat(new_uuid, "A2C75A6CFCAD4B9986CEFEE70B97330C");
-            //                strcat(msg, "Task");
-            //            }
-            
             Data* dData = queryDataByID(new_uuid, &dtPacket);
             printf("--->%s\n", dData->dataID);
             printf("--->%s\n", dData->dataName);
@@ -741,7 +820,54 @@ void testWeb(){
             free(Name);
             
         }
+        */
+        
         //  edit and save
+        else if(numtype == 2){
+            printf("[#%d edit+save]----------------------\n",numtype);
+
+            token = strtok(NULL,":");
+            char *dtID = strdup(token);
+            printf("dtID: %s\n",dtID);
+            
+            token = strtok(NULL,":");
+            char *content = strdup(token);
+            printf("content: %s\n",content);
+            
+            saveNewDataContentByID(dtID, content, &dtPacket);
+            
+            Data* dData = queryDataByID(dtID, &dtPacket);
+            
+            //  check data
+            printf("dataID: %s\n", dData->dataID);
+            printf("dataName: %s\n", dData->dataName);
+            printf("dataType: %d\n", dData->dataType);
+            printf("chatRoom: %s\n", dData->chatRoom);
+            printf("--------------------\n");
+            printf("versionKeeped: %d\n", dData->content->versionKeeped);
+            printf("--------------------\n");
+            printf("SHA256hashCode: %s\n", dData->content->lastestCommon->SHA256hashCode);
+            printf("timeStamp: %s\n", dData->content->lastestCommon->timeStamp);
+            printf("isDiff: %d\n", dData->content->lastestCommon->isDiff);
+            printf("--------------------\n");
+            
+            char* strDT = genString(dData);
+            char* msg = genMsg(dData);
+            
+            char rep_str[10000];
+            sprintf(rep_str, "5:%s:%s", msg, strDT);
+            printf("%s\n", rep_str);
+            s_send(responder, rep_str);
+            printf("\n\n");
+            
+            free(dtID);
+            free(content);
+            freeData(dData);
+            free(strDT);
+            free(msg);
+            free(str);
+        }
+        /*
         else if(numtype == 2){
             printf("[#%d edit+save]----------------------\n",numtype);
             
@@ -781,7 +907,42 @@ void testWeb(){
             //            free(msg);
             freeData(dData);
         }
+         */
+        
         //  delete
+        else if(numtype == 3){
+            printf("[#%d delete]----------------------\n",numtype);
+            
+            token = strtok(NULL,":");
+            char *objID = strdup(token);
+            printf("objID: %s\n",objID);
+            
+            token = strtok(NULL,":");
+            char *upperID = strdup(token);
+            printf("upperID: %s\n",upperID);
+            
+            token = strtok(NULL,":");
+            char *userID = strdup(token);
+            printf("userID: %s\n",userID);
+            
+            ReturnErr chk = deleteObj(userID, upperID, objID, &dtPacket);
+            if (chk == 0){
+                char rep_str[100];
+                sprintf(rep_str, "6:%s:%s", "Delete success", objID);
+                printf("%s\n", rep_str);
+                s_send(responder, rep_str);
+            }
+            else{
+                s_send(responder, "404:Delete failed");
+            }
+            printf("\n\n");
+            
+            free(objID);
+            free(upperID);
+            free(userID);
+            free(str);
+        }
+        /*
         else if(numtype == 3){
             printf("[#%d delete]----------------------\n",numtype);
             
@@ -790,7 +951,38 @@ void testWeb(){
             s_send(responder, "test");
             printf("\n\n");
         }
+         */
+
         //  query data
+        else if(numtype == 4){
+            printf("[#%d query]----------------------\n",numtype);
+
+            token = strtok(NULL,":");
+            char *dtID = strdup(token);
+            printf("dtID: %s\n",dtID);
+            
+            Data *data = queryDataByID(dtID, &dtPacket);
+
+            if (data != NULL){
+                char* msg = genMsg(data);
+                char rep_str[100];
+                sprintf(rep_str, "1:%s:%s:%s", msg, data->dataID, data->dataName);
+                printf("%s\n", rep_str);
+                s_send(responder, rep_str);
+                
+                freeData(data);
+                free(msg);
+            }
+            else{
+                printf("not found data from '%d'!!!\n",dtID);
+                s_send(responder, "404:not found data");
+            }
+            printf("\n\n");
+            
+            free(dtID);
+            free(str);
+        }
+        /*
         else if(numtype == 4){
             printf("[#%d query]----------------------\n",numtype);
             
@@ -800,28 +992,13 @@ void testWeb(){
             free(str);
             printf(">>>>> Query function <<<<<\n");
             
-            // Org** ddt = queryOrgFromData(uuid, &dtPacket);
-            // User** ddt = queryAllUsersFromData(uuid, &dtPacket);
-            // Category** ddt = queryAllCategoriesFromData(uuid,&dtPacket);
-            // State** ddt = queryAllStatesFromData(uuid, &dtPacket);
-            // Task** ddt = queryAllTasksFromData(uuid, &dtPacket);
-            // SubTask** ddt = queryAllSubTasksFromData(uuid, &dtPacket);
-            // for (int i = 0; ddt[i] != NULL; ++i)
-            // {
-            //     printf("------------- %d ---------------\n", i);
-            //     printf("DataID: %s\n", ddt[i]->dataID);
-            //     printf("DataNane: %s\n", ddt[i]->dataName);
-            //     printf("DataType: %d\n", ddt[i]->dataType);
-            //     printf("--------------------------------\n");
-            
-            // }
-            
             Data *data = queryDataByID(id, &dtPacket);
             char* strDT = genString(data);
             char* msg = genMsg(data);
             printf("-=-=-=-=-=- %s\n", msg);
             char rep_str[10000];
             sprintf(rep_str, "1:%s:%s", msg, strDT);
+         
             printf(">>>>> Finished Query <<<<<\n");
             printf("%s\n", rep_str);
             s_send(responder, rep_str);
@@ -832,17 +1009,18 @@ void testWeb(){
             //            free(msg);
             freeData(data);
         }
+         */
+        
         //  clone
         else if(numtype == 5){
             printf("[#%d clone]----------------------\n",numtype);
             
             token = strtok(NULL,":");
-            char *id = strdup(token);
-            printf("id : %s\n", id);
+            char *dtID = strdup(token);
+            printf("dtID : %s\n", dtID);
             
             //---- sendMsg ------------------------------------------------------------
             printf("\n---- sendMsg ----\n");
-            //            char msg[256];
             
             token = strtok(NULL,":");
             char *mySender = strdup(token);
@@ -852,12 +1030,8 @@ void testWeb(){
             char *myTarget = strdup(token);
             printf("target: %s\n",myTarget);
             
-            //            sprintf(msg,"%s",id);
-            
-            free(str);
-            
             //---- query data ---------------------
-            Data* dt = queryDataByID(id,&dtPacket);
+            Data* dt = queryDataByID(dtID,&dtPacket);
             char* strPack = NULL;
             if(dt != NULL){
                 strPack = buildStringFromData(dt);
@@ -878,8 +1052,9 @@ void testWeb(){
                 message.bytesCount = (int)strlen(strPack);
             }
             else{
-                message.msg = id;
-                message.bytesCount = (int)strlen(id);
+//                message.msg = "Your dataID is incorrect";
+                message.msg = "failed";
+                message.bytesCount = strlen("Your dataID is incorrect");
             }
             
             printf("msg: %s\nbytes: %d\n",message.msg,message.bytesCount);
@@ -892,11 +1067,21 @@ void testWeb(){
             }
             //-------------------------------------------------------------------------
             
-            char rep_str[100]="5:clone success";
-            strcat(rep_str,":");
-            strcat(rep_str,id);
-            strcat(rep_str,":");
-            strcat(rep_str,mySender);
+            char rep_str[100]="3:";
+            if(dt!=NULL){
+                strcat(rep_str,"clone data success:");
+                strcat(rep_str,dtID);
+                strcat(rep_str,":");
+                strcat(rep_str,mySender);
+            }
+            else{
+                strcat(rep_str,message.msg);
+                strcat(rep_str,":");
+                strcat(rep_str,dtID);
+                strcat(rep_str,":");
+                strcat(rep_str,mySender);
+            }
+            
             printf("rep_str: %s\n",rep_str);
             s_send(responder, rep_str);
             printf("\n\n");
@@ -905,18 +1090,19 @@ void testWeb(){
                 freeData(dt);
                 free(strPack);
             }
-            free(id);
-            //            free(user);
+            
+            free(dtID);
             free(mySender);
             free(myTarget);
+            free(str);
         }
+        
         //  login
         else if(numtype == 6){
             printf("[#%d login]----------------------\n",numtype);
             
             token = strtok(NULL,":");
             char *usrname = strdup(token);
-            free(str);
             printf("username(login): %s\n",usrname);
             
             TPUserID userID;
@@ -928,24 +1114,23 @@ void testWeb(){
                 fprintf(stderr, "Client loginUser return (%d)\n", ret);
             }
             
-            char rep_str[100]="6:login success";
-            strcat(rep_str,":");
+            char rep_str[100]="2:login success:";
             strcat(rep_str,usrname);
             s_send(responder, rep_str);
             printf("\n\n");
             
             free(usrname);
+            free(str);
         }
+        
         //  logout
         else if(numtype==0){
             printf("[#%d logout]----------------------\n",numtype);
             
             token = strtok(NULL,":");
             char *usrname = strdup(token);
-            free(str);
-            
             printf("username(logout): %s\n",usrname);
-            
+
             TPUserID userID;
             memset(&userID,0,sizeof(userID));
             strcpy((char*)userID,usrname);
@@ -955,26 +1140,25 @@ void testWeb(){
                 fprintf(stderr, "Client logoutUser return (%d)\n", ret);
             }
             
-            char rep_str[100]="0:logout success";
-            strcat(rep_str,":");
+            char rep_str[100]="0:logout success:";
             strcat(rep_str,usrname);
             s_send(responder,rep_str);
             printf("\n\n");
             
             free(usrname);
+            free(str);
         }
+        
         //  read msg
         else if(numtype==10){
-            printf("[#%d readMsg]----------------------\n",numtype);
+            printf("[#%d read msg]----------------------\n",numtype);
             
             token = strtok(NULL,":");
             char *myUserID = strdup(token);
-            free(str);
-            
-            char myMsg[400]="10";
             printf("username(req): %s\n",myUserID);
             
-            char* id;
+            char* dtID;
+            char myMsg[400]="10:";
             
             TPUserID userID;
             TPTransportMsg *message;
@@ -1000,7 +1184,6 @@ void testWeb(){
                 printf("cloned msg: %s\n",message->msg);
                 //                printf("%s: %s\n", message->from, message->msg);
                 //                printf("'%s'->'%s': '%s' @%lu\n", message->from, message->to, message->msg, message->timestamp);
-                strcat(myMsg,":");
                 strcat(myMsg,myUserID);
                 strcat(myMsg,":");
                 strcat(myMsg,message->from);
@@ -1009,36 +1192,316 @@ void testWeb(){
                 strcat(myMsg,":");
                 //                strcat(myMsg,message->msg);
                 token = strtok(message->msg,":");
-                printf("cloned id: %s\n",id);
-                id = strdup(token);
-                strcat(myMsg,id);
-                //                strcat(myMsg,":");
-                //
-                //                char tstamp[20]="";
-                //                sprintf(tstamp,"%lu",message->timestamp);
-                //                //                printf("time: @%lu\n",message->timestamp);
-                //                strcat(myMsg,tstamp);
-                
-                TPMsgFree(message);
+                dtID = strdup(token);
+                printf("cloned id: %s\n",dtID);
+                strcat(myMsg,dtID);
                 
                 printf("send this str: %s\n",myMsg);
                 s_send(responder,myMsg);
-                free(id);
+                free(dtID);
             } else {
                 printf("not found message\n");
-                strcat(myMsg,":");
                 strcat(myMsg,myUserID);
                 strcat(myMsg,":none");
                 s_send(responder,myMsg);
             }
             printf("\n\n");
             
+            TPMsgFree(message);
             free(myUserID);
+//            free(dtID);
+            free(str);
         }
+        
+        //  get datalists
+        else if(numtype == 7){
+            printf("[#%d get datalists]----------------------\n",numtype);
+            
+            char** list;
+            char strlists[10000] = "";
+            char rep_str[10000];
+            
+            token = strtok(NULL,":");
+            int casetype = atoi(token);
+            
+            token = strtok(NULL,":");
+            char *dtID = strdup(token);
+            printf("dtID : %s\n", dtID);
+            
+            if (casetype == 1){
+                list = getUserFromOrgID(dtID, &dtPacket);
+                if (list != NULL){
+                    printf("\n--- test list ---\n");
+                    for(int i=0;list[i]!=NULL;i++){
+                        printf("list[%d]: %s\n",i,list[i]);
+                        strcat(strlists, list[i]);
+                        strcat(strlists, ":");
+                        free(list[i]);
+                    }
+                    free(list);
+                    
+                    sprintf(rep_str, "4:User:%s", strlists);
+                    printf("%s\n", rep_str);
+                    s_send(responder, rep_str);
+                }
+                else{
+                    s_send(responder, "404:Userlists are NULL");
+                }
+                
+                
+            }
+            else if (casetype == 2){
+                list = getCatFromUserID(dtID, &dtPacket);
+                if (list != NULL){
+                    printf("\n--- test list ---\n");
+                    for(int i=0;list[i]!=NULL;i++){
+                        printf("list[%d]: %s\n",i,list[i]);
+                        strcat(strlists, list[i]);
+                        strcat(strlists, ":");
+                        free(list[i]);
+                    }
+                    free(list);
+                    
+                    sprintf(rep_str, "4:Category:%s", strlists);
+                    printf("%s\n", rep_str);
+                    s_send(responder, rep_str);
+                }
+                else{
+                    s_send(responder, "404:Categorylists are NULL");
+                }
+            }
+            else if (casetype == 3){
+                list = getStateFromCatID(dtID, &dtPacket);
+                if (list != NULL){
+                    printf("\n--- test list ---\n");
+                    for(int i=0;list[i]!=NULL;i++){
+                        printf("list[%d]: %s\n",i,list[i]);
+                        strcat(strlists, list[i]);
+                        strcat(strlists, ":");
+                        free(list[i]);
+                    }
+                    free(list);
+                    
+                    sprintf(rep_str, "4:State:%s", strlists);
+                    printf("%s\n", rep_str);
+                    s_send(responder, rep_str);
+                }
+                else{
+                    s_send(responder, "404:Statelists are NULL");
+                }
+            }
+            else if (casetype == 4){
+                list = getTaskFromStateID(dtID, &dtPacket);
+                if (list != NULL){
+                    printf("\n--- test list ---\n");
+                    for(int i=0;list[i]!=NULL;i++){
+                        printf("list[%d]: %s\n",i,list[i]);
+                        strcat(strlists, list[i]);
+                        strcat(strlists, ":");
+                        free(list[i]);
+                    }
+                    free(list);
+                    
+                    sprintf(rep_str, "4:Task:%s", strlists);
+                    printf("%s\n", rep_str);
+                    s_send(responder, rep_str);
+                }
+                else{
+                    s_send(responder, "404:Tasklists are NULL");
+                }
+            }
+            else if (casetype == 5){
+                list = getSubTaskFromTaskID(dtID, &dtPacket);
+                if (list != NULL){
+                    printf("\n--- test list ---\n");
+                    for(int i=0;list[i]!=NULL;i++){
+                        printf("list[%d]: %s\n",i,list[i]);
+                        strcat(strlists, list[i]);
+                        strcat(strlists, ":");
+                        free(list[i]);
+                    }
+                    free(list);
+                    
+                    sprintf(rep_str, "4:Subtask:%s", strlists);
+                    printf("%s\n", rep_str);
+                    s_send(responder, rep_str);
+                }
+                else{
+                    s_send(responder, "404:Subtasklists are NULL");
+                }
+            }
+            else if (casetype == 6){
+                list = getTaskFromCatID(dtID, &dtPacket);
+                if (list != NULL){
+                    printf("\n--- test list ---\n");
+                    for(int i=0;list[i]!=NULL;i++){
+                        printf("list[%d]: %s\n",i,list[i]);
+                        strcat(strlists, list[i]);
+                        strcat(strlists, ":");
+                        free(list[i]);
+                    }
+                    free(list);
+                    
+                    sprintf(rep_str, "4:TaskfromCat:%s", strlists);
+                    printf("%s\n", rep_str);
+                    s_send(responder, rep_str);
+                }
+                else{
+                    s_send(responder, "404:TaskfromCat are NULL");
+                }
+            }
+            else if (casetype == 7){
+                list = getSubTaskFromTaskID(dtID, &dtPacket);
+                if (list != NULL){
+                    printf("\n--- test list ---\n");
+                    for(int i=0;list[i]!=NULL;i++){
+                        printf("list[%d]: %s\n",i,list[i]);
+                        strcat(strlists, list[i]);
+                        strcat(strlists, ":");
+                        free(list[i]);
+                    }
+                    free(list);
+                    
+                    sprintf(rep_str, "4:SubtaskfromCat:%s", strlists);
+                    printf("%s\n", rep_str);
+                    s_send(responder, rep_str);
+                }
+                else{
+                    s_send(responder, "404:SubtaskfromCat are NULL");
+                }
+            }
+            else if (casetype == 8){
+                list = getOrgID(&dtPacket);
+                if (list != NULL){
+                    printf("\n--- test list ---\n");
+                    for(int i=0;list[i]!=NULL;i++){
+                        printf("list[%d]: %s\n",i,list[i]);
+                        strcat(strlists, list[i]);
+                        strcat(strlists, ":");
+                        free(list[i]);
+                    }
+                    free(list);
+                    
+                    sprintf(rep_str, "4:Org:%s", strlists);
+                    printf("%s\n", rep_str);
+                    s_send(responder, rep_str);
+                }
+                else{
+                    s_send(responder, "404:Orglists are NULL");
+                }
+            }
+            printf("\n\n");
+            
+            if(dtID != NULL){
+                free(dtID);
+            }
+            free(str);
+        }
+        
+        //  query data from datalists
+        else if(numtype == 8){
+            printf("[#%d query data from datalists]----------------------\n",numtype);
+            
+            token = strtok(NULL,":");
+            char *dtID = strdup(token);
+            printf("dtID : %s\n", dtID);
+            
+            Data *Qdata = queryDataByID(dtID, &dtPacket);
+            if (Qdata != NULL){
+                char* strDT = genString(Qdata);
+                char* msg = genMsg(Qdata);
+                
+                char rep_str[10000];
+                sprintf(rep_str, "5:%s:%s", msg, strDT);
+                printf("%s\n", rep_str);
+                s_send(responder, rep_str);
+            }
+            else{
+                s_send(responder, "404:not found data");
+            }
+            printf("\n\n");
+            
+            free(dtID);
+            free(str);
+        }
+        
+        //  add Edge
+        else if(numtype == 9){
+            printf("[#%d add edge]----------------------\n",numtype);
+            
+            token = strtok(NULL,":");
+            int casetype = atoi(token);
+            
+            token = strtok(NULL,":");
+            char *Rdata = strdup(token);
+            
+            token = strtok(NULL,":");
+            char *Ldata = strdup(token);
+            
+            if (casetype == 1){
+                int chk = addUser2OrgByID(Ldata, Rdata, &dtPacket);
+                if (chk == 0){
+                    s_send(responder, "404:add User -> Org success");
+                }
+                else{
+                    s_send(responder, "404:add User -> Org error!");
+                }
+            }
+            else if (casetype == 2){
+                int chk = addCategory2UserByID(Ldata, Rdata, &dtPacket);
+                if (chk == 0){
+                    s_send(responder, "404:add Category -> User success");
+                }
+                else{
+                    s_send(responder, "404:add Category -> User error!");
+                }
+            }
+            else if (casetype == 3){
+                int chk = addState2CategoryByID(Ldata, Rdata, &dtPacket);
+                if (chk == 0){
+                    s_send(responder, "404:add State -> Category success");
+                }
+                else{
+                    s_send(responder, "404:add State -> Category error!");
+                }
+            }
+            else if (casetype == 4){
+                int chk = addTask2StateByID(Ldata, Rdata, &dtPacket);
+                if (chk == 0){
+                    s_send(responder, "404:add Task -> State success");
+                }
+                else{
+                    s_send(responder, "404:add Task -> State error!");
+                }
+            }
+            else if (casetype == 5){
+                int chk = addSubTask2TaskByID(Ldata, Rdata, &dtPacket);
+                if (chk == 0){
+                    s_send(responder, "404:add Subtask -> Task success");
+                }
+                else{
+                    s_send(responder, "404:add Subtask -> Task error!");
+                }
+            }
+            else if (casetype == 6){
+                int chk = addTask2CategoryByID(Ldata, Rdata, &dtPacket);
+                if (chk == 0){
+                    s_send(responder, "404:add Task -> Category success");
+                }
+                else{
+                    s_send(responder, "404:add Task -> Category error!");
+                }
+            }
+            printf("\n\n");
+            
+            free(Rdata);
+            free(Ldata);
+            free(str);
+        }
+        
         else{
             printf("error numtype\n");
         }
-        
     }
 }
 

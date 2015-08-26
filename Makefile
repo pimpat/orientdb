@@ -5,6 +5,7 @@ CC = gcc
 
 BUILD_FLAG = -w -c
 DEBUG_FLAG = -w -c -g
+TP_LIB = -L/usr/local/lib/ -ltransport -lzmq -I/usr/local/include
 
 BUILD_DIR = build/
 SRC_DIR = src/
@@ -26,14 +27,15 @@ BIN_OBJ = $(notdir $(patsubst %.cpp,%.o,$(patsubst %.c,%.o,$(SRC_C))))
 ################################################
 
 bin:dep $(notdir $(SRC_C))
-	$(CPP) -o $(BIN_DIR)$(OUTPUT_O) $(DEPEN_FILE) $(addprefix $(BIN_DIR),$(BIN_OBJ))
+	$(CPP) $(TP_LIB) -o $(BIN_DIR)$(OUTPUT_O) $(DEPEN_FILE) $(addprefix $(BIN_DIR),$(BIN_OBJ))
 	# g++ -w -c -g -I$(INCLUDE_DIR) main.cpp && g++ -o main main.o reqmsg.o swap_endian.o dmp.o ezxml.o && ./main
+	#./build/bin/app.o
 
 %.c:
 	$(CC) $(BUILD_FLAG)  -I$(INCLUDE_DIR) $(SRC_DIR)$@ -o $(BIN_DIR)$(patsubst %.c,%.o,$@)
 
 %.cpp:
-	$(CC) $(DEBUG_FLAG)  -I$(INCLUDE_DIR) $(SRC_DIR)$@ -o $(BIN_DIR)$(patsubst %.cpp,%.o,$@)
+	$(CC) $(DEBUG_FLAG) $(TP_LIB) -I$(INCLUDE_DIR) $(SRC_DIR)$@ -o $(BIN_DIR)$(patsubst %.cpp,%.o,$@)
 
 dep:
 	$(MAKE) -C $(DEPEN_DIR)
